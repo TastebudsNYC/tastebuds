@@ -423,10 +423,32 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
   const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
+
+  function resetSignupState() {
+    clearAppBootstrapCache()
+    clearPendingSignup()
+    clearSignupConfirmationSignal()
+    clearOnboardingActivationPending()
+    setDraft(createEmptyProfileDraft())
+    setUserId(null)
+    setEmail('')
+    setPassword('')
+    setConfirmPassword('')
+    setRestaurants([])
+    setSelectedRestaurant(null)
+    setStage('welcome-1')
+    setAuthenticated(false)
+  }
+
   useEffect(() => {
     let active = true
 
     async function bootstrapFlow() {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -435,25 +457,19 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         return
       }
 
-      if (!session?.user) {
+      if (userError || !user || !session?.user || user.id !== session.user.id) {
+        await supabase.auth.signOut()
+
+        if (!active) {
+          return
+        }
+
         if (mode === 'resume') {
           router.replace('/login')
           return
         }
 
-        clearAppBootstrapCache()
-        clearPendingSignup()
-        clearSignupConfirmationSignal()
-        clearOnboardingActivationPending()
-        setDraft(createEmptyProfileDraft())
-        setUserId(null)
-        setEmail('')
-        setPassword('')
-        setConfirmPassword('')
-        setRestaurants([])
-        setSelectedRestaurant(null)
-        setStage('welcome-1')
-        setAuthenticated(false)
+        resetSignupState()
         setSessionChecked(true)
         return
       }
@@ -504,29 +520,18 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       setStage(getProfileStartStage(nextDraft))
     }
 
-    void bootstrapFlow().catch(() => {
-        if (active) {
-          if (mode === 'resume') {
-            router.replace('/login')
-            return
-          }
-
-          clearAppBootstrapCache()
-          clearPendingSignup()
-          clearSignupConfirmationSignal()
-          clearOnboardingActivationPending()
-          setDraft(createEmptyProfileDraft())
-          setUserId(null)
-          setEmail('')
-          setPassword('')
-          setConfirmPassword('')
-          setRestaurants([])
-          setSelectedRestaurant(null)
-          setStage('welcome-1')
-          setAuthenticated(false)
-          setSessionChecked(true)
+    void bootstrapFlow().catch(async () => {
+      if (active) {
+        if (mode === 'resume') {
+          router.replace('/login')
+          return
         }
-      })
+
+        await supabase.auth.signOut()
+        resetSignupState()
+        setSessionChecked(true)
+      }
+    })
 
     return () => {
       active = false
@@ -632,8 +637,22 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       setRestaurants(nextRestaurants)
       setStage('restaurants')
     } catch (nextError) {
-      setError(
+      const message =
         nextError instanceof Error ? nextError.message : 'Could not save your profile.'
+
+      if (
+        message.includes('profiles_id_fkey') ||
+        message.includes('violates foreign key constraint')
+      ) {
+        await supabase.auth.signOut()
+        resetSignupState()
+        setSessionChecked(true)
+        setError('Your previous signup session is no longer valid. Start again to create a new account.')
+        return
+      }
+
+      setError(
+        message
       )
     } finally {
       setRestaurantsLoading(false)
