@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/app/Button'
-import { RestaurantCard } from '@/components/app/RestaurantCard'
-import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
+import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
+import { TasteTag } from '@/components/app/TasteTag'
 import { TastebudsLogo } from '@/components/TastebudsLogo'
 import {
   LocationSearchField,
@@ -71,6 +71,11 @@ type StageId =
   | 'finish'
 
 const ONBOARDING_ACTIVATION_KEY = 'tastebuds:onboarding-activation-pending'
+const ONBOARDING_RESTAURANT_IMAGES = [
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuDCoHML1D-nS9Lpd8JQsgkHZQy7xiCa4Cx9EeNcbmIe5Kp0jdxofD_dVVn6Ze22xEPoZgJTuKre5B1fsb1Pbbme3gUS-P9eUKSbS3DQQs4TkPqXXH3lEx8hArTWwf3eLo4jmiZBqoc5svsyFDFqKkvvC_rj4reYIojqZPtWbKTLiBugXIwtxa9qGGkVZ1Qvn7lEgs5cvkJpPYEypfeu3_hwcW_FJI1Rnh9Ib_QPpp-r_W-cmqmkxuliA_xVq0jvZHb9l0FtG2aimNlH',
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuAslHXH8KjoZPnFH9tLgGOz8rpffzYp31oJCQ03BpWAGdwlFuUFHoISTgdAoZH_NjW-csUz083j3OW2m7Eg3SuZatWjxorJGliozLUIdLQ8c8z6hpL2bj-HYYYYraZ1M28INpoA-BFsk74mlHt5pUxujHqONyF7wwIBG2LeEI48EBwtXkT82xYxLlx3ZfU9xA0fKFD9uG5VwLYImjp2Ds_E_MAAvem_kn52S1La_X3JIpw26-1BtApNmFDKsn5tXXeqRiG9EglOZ9X-',
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuANwT_OCTmuJC4naZhU3nuu-_tl7nhx6boXESOu4GLp5ZWE2QupS8HMNQ8yy0ZzGILo9KDGkmYrfwOLwnmf-PZa_KNHdtjFKXI3pdft5g3EDqysljfjWnmqJQWnFOECkd1pt8ssY2BZq9Y5OJu_J9oiPE-ORo3hrHoDFk9xM-r8zFq_WS3azkfo5wzdoYL0xRq9J7_gQ0fi_xMOec9JpOSZFaAFZtm5hw0wQLDQAfNvmSuc06elFW9SCXwRrjWPtLEmFN4LjA5o3yx8',
+] as const
 
 const SIGNUP_STAGE_SEQUENCE: StageId[] = [
   'welcome-1',
@@ -263,6 +268,27 @@ function ChoiceGroup({
   )
 }
 
+function formatRestaurantMeta(restaurant: DashboardRestaurant) {
+  const bits = [restaurant.subregion]
+
+  if (restaurant.restaurant_cuisines?.[0]) {
+    bits.push(restaurant.restaurant_cuisines[0])
+  }
+
+  if (restaurant.venue_price) {
+    bits.push(restaurant.venue_price)
+  }
+
+  return bits.join(' · ')
+}
+
+function getRestaurantFallbackImage(index: number) {
+  return (
+    ONBOARDING_RESTAURANT_IMAGES[index % ONBOARDING_RESTAURANT_IMAGES.length] ??
+    ONBOARDING_RESTAURANT_IMAGES[0]!
+  )
+}
+
 function toggleValue(current: string[], value: string) {
   return current.includes(value)
     ? current.filter((entry) => entry !== value)
@@ -386,7 +412,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
+  const [expandedRestaurantId, setExpandedRestaurantId] = useState<number | null>(null)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   useEffect(() => {
@@ -599,7 +625,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     setError('')
 
     const previousRestaurants = restaurants
-    const previousSelectedRestaurant = selectedRestaurant
 
     const optimisticRestaurants = restaurants.map((restaurant) =>
       restaurant.id === restaurantId
@@ -609,28 +634,13 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
     setRestaurants(optimisticRestaurants)
 
-    if (previousSelectedRestaurant?.id === restaurantId) {
-      setSelectedRestaurant(
-        previousSelectedRestaurant
-          ? { ...previousSelectedRestaurant, isSaved: action === 'save' }
-          : previousSelectedRestaurant
-      )
-    }
-
     try {
       await setSavedRestaurant(restaurantId, action)
       const payload = await fetchRestaurants()
       const nextRestaurants = payload.restaurants ?? optimisticRestaurants
       setRestaurants(nextRestaurants)
-
-      if (previousSelectedRestaurant?.id === restaurantId) {
-        setSelectedRestaurant(
-          nextRestaurants.find((restaurant) => restaurant.id === restaurantId) ?? null
-        )
-      }
     } catch (nextError) {
       setRestaurants(previousRestaurants)
-      setSelectedRestaurant(previousSelectedRestaurant)
       setError(
         nextError instanceof Error
           ? nextError.message
@@ -663,6 +673,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const disableContinue = !isStageComplete(stage, draft)
   const savedRestaurantCount = restaurants.filter((restaurant) => restaurant.isSaved).length
   const restaurantSelectionRequired = restaurants.length >= 2
+  const onboardingRestaurants = restaurants.slice(0, 3)
   const activationProgressText = restaurantSelectionRequired
     ? savedRestaurantCount >= 2
       ? `${savedRestaurantCount} saved`
@@ -1237,18 +1248,110 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             <div className="rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-6 text-sm text-[color:var(--text-secondary)]">
               Loading restaurants...
             </div>
-          ) : restaurants.length > 0 ? (
+          ) : onboardingRestaurants.length > 0 ? (
             <div className="space-y-4">
-              {restaurants.slice(0, 6).map((restaurant) => (
-                <RestaurantCard
+              {onboardingRestaurants.map((restaurant, index) => (
+                <article
+                  className="overflow-hidden rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.06)]"
                   key={restaurant.id}
-                  onOpenDetails={setSelectedRestaurant}
-                  onToggleSaved={(restaurantId, action) =>
-                    void handleToggleSavedRestaurant(restaurantId, action)
-                  }
-                  restaurant={restaurant}
-                  saving={restaurantActionLoadingId === restaurant.id}
-                />
+                >
+                  <button
+                    className="grid w-full gap-0 text-left md:grid-cols-[180px_minmax(0,1fr)]"
+                    onClick={() =>
+                      setExpandedRestaurantId((current) =>
+                        current === restaurant.id ? null : restaurant.id
+                      )
+                    }
+                    type="button"
+                  >
+                    <div className="relative h-40 overflow-hidden md:h-full">
+                      <GooglePlacePhoto
+                        alt={restaurant.name}
+                        enableCarousel={false}
+                        fallbackSrc={getRestaurantFallbackImage(index)}
+                        imageClassName="h-full w-full object-cover"
+                        placeId={restaurant.googlePlaceId}
+                      />
+                    </div>
+                    <div className="p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-[color:var(--text-secondary)]">
+                            {formatRestaurantMeta(restaurant)}
+                          </p>
+                          <h2 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--foreground)]">
+                            {restaurant.name}
+                          </h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-1.5 text-sm font-semibold text-[color:var(--accent-strong)]">
+                            {restaurant.matchScore}/100
+                          </span>
+                          <span
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${
+                              restaurant.isSaved
+                                ? 'bg-[color:var(--status-bg)] text-[color:var(--status-text)]'
+                                : 'bg-[color:var(--surface-soft)] text-[color:var(--text-secondary)]'
+                            }`}
+                          >
+                            {restaurant.isSaved ? 'Saved' : 'Choice'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--text-secondary)]">
+                        {restaurant.venueMatchSummary}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {(restaurant.matchTags?.slice(0, 3) ?? []).map((tag) => (
+                          <TasteTag key={`${restaurant.id}-${tag}`}>{tag}</TasteTag>
+                        ))}
+                      </div>
+                    </div>
+                  </button>
+
+                  {expandedRestaurantId === restaurant.id ? (
+                    <div className="border-t border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-5 py-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="max-w-2xl">
+                          <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                            {restaurant.availableEventCount > 0
+                              ? `${restaurant.availableEventCount} live table${restaurant.availableEventCount === 1 ? '' : 's'} available`
+                              : 'No live tables yet'}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
+                            {restaurant.isSaved
+                              ? 'Already saved. This will show up on your dashboard after setup.'
+                              : 'Save this if you’d genuinely be happy to book it.'}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-3">
+                          <Button
+                            disabled={restaurantActionLoadingId === restaurant.id}
+                            onClick={() =>
+                              void handleToggleSavedRestaurant(
+                                restaurant.id,
+                                restaurant.isSaved ? 'unsave' : 'save'
+                              )
+                            }
+                            variant={restaurant.isSaved ? 'secondary' : 'primary'}
+                          >
+                            {restaurantActionLoadingId === restaurant.id
+                              ? 'Updating...'
+                              : restaurant.isSaved
+                                ? 'Unsave'
+                                : 'Save venue'}
+                          </Button>
+                          <Button
+                            href="/restaurants"
+                            variant="secondary"
+                          >
+                            Browse more
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
               ))}
             </div>
           ) : (
@@ -1269,6 +1372,9 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               onClick={handleActivationContinue}
             >
               Continue
+            </Button>
+            <Button onClick={handleActivationContinue} variant="secondary">
+              Skip for now
             </Button>
             <Button onClick={goBack} variant="secondary">
               Back
@@ -1305,20 +1411,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         <div className="mt-6 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-4 text-sm text-[color:var(--foreground)]">
           {message}
         </div>
-      ) : null}
-
-      {selectedRestaurant ? (
-        <RestaurantDetailsModal
-          onClose={() => setSelectedRestaurant(null)}
-          onToggleSaved={(restaurantId, action) =>
-            void handleToggleSavedRestaurant(restaurantId, action)
-          }
-          restaurant={
-            restaurants.find((restaurant) => restaurant.id === selectedRestaurant.id) ??
-            selectedRestaurant
-          }
-          saving={restaurantActionLoadingId === selectedRestaurant.id}
-        />
       ) : null}
     </StageShell>
   )
