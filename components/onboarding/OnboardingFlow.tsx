@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
+import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { TasteTag } from '@/components/app/TasteTag'
 import { TastebudsLogo } from '@/components/TastebudsLogo'
 import {
@@ -412,7 +413,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
-  const [expandedRestaurantId, setExpandedRestaurantId] = useState<number | null>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   useEffect(() => {
@@ -1255,15 +1256,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
                   className="overflow-hidden rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.06)]"
                   key={restaurant.id}
                 >
-                  <button
-                    className="grid w-full gap-0 text-left md:grid-cols-[180px_minmax(0,1fr)]"
-                    onClick={() =>
-                      setExpandedRestaurantId((current) =>
-                        current === restaurant.id ? null : restaurant.id
-                      )
-                    }
-                    type="button"
-                  >
+                  <div className="grid gap-0 md:grid-cols-[180px_minmax(0,1fr)]">
                     <div className="relative h-40 overflow-hidden md:h-full">
                       <GooglePlacePhoto
                         alt={restaurant.name}
@@ -1307,50 +1300,48 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
                         ))}
                       </div>
                     </div>
-                  </button>
+                  </div>
 
-                  {expandedRestaurantId === restaurant.id ? (
-                    <div className="border-t border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-5 py-4">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="max-w-2xl">
-                          <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                            {restaurant.availableEventCount > 0
-                              ? `${restaurant.availableEventCount} live table${restaurant.availableEventCount === 1 ? '' : 's'} available`
-                              : 'No live tables yet'}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
-                            {restaurant.isSaved
-                              ? 'Already saved. This will show up on your dashboard after setup.'
-                              : 'Save this if you’d genuinely be happy to book it.'}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-3">
-                          <Button
-                            disabled={restaurantActionLoadingId === restaurant.id}
-                            onClick={() =>
-                              void handleToggleSavedRestaurant(
-                                restaurant.id,
-                                restaurant.isSaved ? 'unsave' : 'save'
-                              )
-                            }
-                            variant={restaurant.isSaved ? 'secondary' : 'primary'}
-                          >
-                            {restaurantActionLoadingId === restaurant.id
-                              ? 'Updating...'
-                              : restaurant.isSaved
-                                ? 'Unsave'
-                                : 'Save venue'}
-                          </Button>
-                          <Button
-                            href="/restaurants"
-                            variant="secondary"
-                          >
-                            Browse more
-                          </Button>
-                        </div>
+                  <div className="border-t border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-5 py-4">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="max-w-2xl">
+                        <p className="text-sm font-semibold text-[color:var(--foreground)]">
+                          {restaurant.availableEventCount > 0
+                            ? `${restaurant.availableEventCount} live table${restaurant.availableEventCount === 1 ? '' : 's'} available`
+                            : 'No live tables yet'}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
+                          {restaurant.isSaved
+                            ? 'Already saved. This will show up on your dashboard after setup.'
+                            : 'Save this if you’d genuinely be happy to book it.'}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-3">
+                        <Button
+                          disabled={restaurantActionLoadingId === restaurant.id}
+                          onClick={() =>
+                            void handleToggleSavedRestaurant(
+                              restaurant.id,
+                              restaurant.isSaved ? 'unsave' : 'save'
+                            )
+                          }
+                          variant={restaurant.isSaved ? 'secondary' : 'primary'}
+                        >
+                          {restaurantActionLoadingId === restaurant.id
+                            ? 'Updating...'
+                            : restaurant.isSaved
+                              ? 'Unsave'
+                              : 'Save venue'}
+                        </Button>
+                        <Button
+                          onClick={() => setSelectedRestaurant(restaurant)}
+                          variant="secondary"
+                        >
+                          View venue
+                        </Button>
                       </div>
                     </div>
-                  ) : null}
+                  </div>
                 </article>
               ))}
             </div>
@@ -1411,6 +1402,20 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         <div className="mt-6 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-4 text-sm text-[color:var(--foreground)]">
           {message}
         </div>
+      ) : null}
+
+      {selectedRestaurant ? (
+        <RestaurantDetailsModal
+          onClose={() => setSelectedRestaurant(null)}
+          onToggleSaved={(restaurantId, action) =>
+            void handleToggleSavedRestaurant(restaurantId, action)
+          }
+          restaurant={
+            restaurants.find((restaurant) => restaurant.id === selectedRestaurant.id) ??
+            selectedRestaurant
+          }
+          saving={restaurantActionLoadingId === selectedRestaurant.id}
+        />
       ) : null}
     </StageShell>
   )
