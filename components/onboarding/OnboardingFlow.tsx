@@ -5,12 +5,19 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/app/Button'
+import { RestaurantCard } from '@/components/app/RestaurantCard'
+import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { TastebudsLogo } from '@/components/TastebudsLogo'
 import {
   LocationSearchField,
   type LocationSuggestion,
 } from '@/components/location-search-field'
-import { clearAppBootstrapCache, getAppBootstrap } from '@/lib/app/client'
+import {
+  clearAppBootstrapCache,
+  fetchRestaurants,
+  getAppBootstrap,
+  setSavedRestaurant,
+} from '@/lib/app/client'
 import { isProfileComplete } from '@/lib/app/format'
 import {
   AGE_RANGE_COMFORT_TAGS,
@@ -32,10 +39,10 @@ import {
   profileToDraft,
   saveProfileDraft,
   SUBREGIONS,
-  summarizeProfileDraft,
   TRAVEL_WINDOWS,
   type ProfileDraft,
 } from '@/lib/app/profile-draft'
+import type { DashboardRestaurant } from '@/lib/app/types'
 import { supabase } from '@/lib/supabase/client'
 
 type FlowMode = 'resume' | 'signup'
@@ -60,7 +67,10 @@ type StageId =
   | 'vibes'
   | 'crowd-conversation'
   | 'group-age'
+  | 'restaurants'
   | 'finish'
+
+const ONBOARDING_ACTIVATION_KEY = 'tastebuds:onboarding-activation-pending'
 
 const SIGNUP_STAGE_SEQUENCE: StageId[] = [
   'welcome-1',
@@ -82,6 +92,7 @@ const SIGNUP_STAGE_SEQUENCE: StageId[] = [
   'vibes',
   'crowd-conversation',
   'group-age',
+  'restaurants',
   'finish',
 ]
 
@@ -100,6 +111,7 @@ const PROFILE_STAGE_SEQUENCE: StageId[] = [
   'vibes',
   'crowd-conversation',
   'group-age',
+  'restaurants',
   'finish',
 ]
 
@@ -371,6 +383,10 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>([])
+  const [restaurantsLoading, setRestaurantsLoading] = useState(false)
+  const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   useEffect(() => {
@@ -402,9 +418,15 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         return
       }
 
+      const activationPending =
+        typeof window !== 'undefined' &&
+        window.sessionStorage.getItem(ONBOARDING_ACTIVATION_KEY) === 'pending'
+
       if (isProfileComplete(bootstrap.profile)) {
-        router.replace('/dashboard')
-        return
+        if (!activationPending) {
+          router.replace('/dashboard')
+          return
+        }
       }
 
       const nextDraft = profileToDraft(bootstrap.profile)
@@ -412,6 +434,29 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       setUserId(bootstrap.userId)
       setAuthenticated(true)
       setSessionChecked(true)
+
+      if (activationPending && isProfileComplete(bootstrap.profile)) {
+        try {
+          const payload = await fetchRestaurants(bootstrap.accessToken)
+          if (!active) {
+            return
+          }
+
+          const nextRestaurants = payload.restaurants ?? []
+          setRestaurants(nextRestaurants)
+          setStage(
+            nextRestaurants.filter((restaurant) => restaurant.isSaved).length >= 2
+              ? 'finish'
+              : 'restaurants'
+          )
+          return
+        } catch {
+          if (!active) {
+            return
+          }
+        }
+      }
+
       setStage(getProfileStartStage(nextDraft))
     }
 
@@ -527,14 +572,81 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     try {
       await saveProfileDraft(supabase, userId, draft)
       clearAppBootstrapCache()
-      setStage('finish')
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(ONBOARDING_ACTIVATION_KEY, 'pending')
+      }
+
+      setRestaurantsLoading(true)
+      const payload = await fetchRestaurants()
+      const nextRestaurants = payload.restaurants ?? []
+      setRestaurants(nextRestaurants)
+      setStage('restaurants')
     } catch (nextError) {
       setError(
         nextError instanceof Error ? nextError.message : 'Could not save your profile.'
       )
     } finally {
+      setRestaurantsLoading(false)
       setLoading(false)
     }
+  }
+
+  async function handleToggleSavedRestaurant(
+    restaurantId: number,
+    action: 'save' | 'unsave'
+  ) {
+    setRestaurantActionLoadingId(restaurantId)
+    setError('')
+
+    const previousRestaurants = restaurants
+    const previousSelectedRestaurant = selectedRestaurant
+
+    const optimisticRestaurants = restaurants.map((restaurant) =>
+      restaurant.id === restaurantId
+        ? { ...restaurant, isSaved: action === 'save' }
+        : restaurant
+    )
+
+    setRestaurants(optimisticRestaurants)
+
+    if (previousSelectedRestaurant?.id === restaurantId) {
+      setSelectedRestaurant(
+        previousSelectedRestaurant
+          ? { ...previousSelectedRestaurant, isSaved: action === 'save' }
+          : previousSelectedRestaurant
+      )
+    }
+
+    try {
+      await setSavedRestaurant(restaurantId, action)
+      const payload = await fetchRestaurants()
+      const nextRestaurants = payload.restaurants ?? optimisticRestaurants
+      setRestaurants(nextRestaurants)
+
+      if (previousSelectedRestaurant?.id === restaurantId) {
+        setSelectedRestaurant(
+          nextRestaurants.find((restaurant) => restaurant.id === restaurantId) ?? null
+        )
+      }
+    } catch (nextError) {
+      setRestaurants(previousRestaurants)
+      setSelectedRestaurant(previousSelectedRestaurant)
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Could not update saved restaurants.'
+      )
+    } finally {
+      setRestaurantActionLoadingId(null)
+    }
+  }
+
+  function handleActivationContinue() {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(ONBOARDING_ACTIVATION_KEY)
+    }
+
+    setStage('finish')
   }
 
   if (!sessionChecked) {
@@ -549,6 +661,13 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   }
 
   const disableContinue = !isStageComplete(stage, draft)
+  const savedRestaurantCount = restaurants.filter((restaurant) => restaurant.isSaved).length
+  const restaurantSelectionRequired = restaurants.length >= 2
+  const activationProgressText = restaurantSelectionRequired
+    ? savedRestaurantCount >= 2
+      ? `${savedRestaurantCount} saved`
+      : 'Save 2 to continue'
+    : `${savedRestaurantCount} saved`
 
   return (
     <StageShell
@@ -1095,12 +1214,75 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
+      {stage === 'restaurants' ? (
+        <div className="space-y-8">
+          <StageHeading
+            eyebrow="Activation"
+            heading="Save a few places you’d actually say yes to"
+            subtext="Pick a couple of restaurants so your first dashboard feels personal."
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-4 py-3">
+            <p className="text-sm font-semibold text-[color:var(--foreground)]">
+              {activationProgressText}
+            </p>
+            <p className="text-sm text-[color:var(--text-secondary)]">
+              {restaurantSelectionRequired
+                ? 'Choose at least 2 restaurants.'
+                : 'Not seeing the right places? You can browse more after setup.'}
+            </p>
+          </div>
+
+          {restaurantsLoading ? (
+            <div className="rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-6 text-sm text-[color:var(--text-secondary)]">
+              Loading restaurants...
+            </div>
+          ) : restaurants.length > 0 ? (
+            <div className="space-y-4">
+              {restaurants.slice(0, 6).map((restaurant) => (
+                <RestaurantCard
+                  key={restaurant.id}
+                  onOpenDetails={setSelectedRestaurant}
+                  onToggleSaved={(restaurantId, action) =>
+                    void handleToggleSavedRestaurant(restaurantId, action)
+                  }
+                  restaurant={restaurant}
+                  saving={restaurantActionLoadingId === restaurant.id}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-6">
+              <p className="text-lg font-semibold text-[color:var(--foreground)]">
+                Not seeing the right places?
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
+                You can browse more after setup.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="min-w-40"
+              disabled={restaurantSelectionRequired && savedRestaurantCount < 2}
+              onClick={handleActivationContinue}
+            >
+              Continue
+            </Button>
+            <Button onClick={goBack} variant="secondary">
+              Back
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {stage === 'finish' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Ready"
             heading="Your Tastebuds profile is ready"
-            subtext={summarizeProfileDraft(draft)}
+            subtext="You’ve set your vibe and saved a few places to start from."
           />
           <div className="flex flex-wrap gap-3">
             <Button className="min-w-44" href="/dashboard">
@@ -1123,6 +1305,20 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         <div className="mt-6 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-4 text-sm text-[color:var(--foreground)]">
           {message}
         </div>
+      ) : null}
+
+      {selectedRestaurant ? (
+        <RestaurantDetailsModal
+          onClose={() => setSelectedRestaurant(null)}
+          onToggleSaved={(restaurantId, action) =>
+            void handleToggleSavedRestaurant(restaurantId, action)
+          }
+          restaurant={
+            restaurants.find((restaurant) => restaurant.id === selectedRestaurant.id) ??
+            selectedRestaurant
+          }
+          saving={restaurantActionLoadingId === selectedRestaurant.id}
+        />
       ) : null}
     </StageShell>
   )

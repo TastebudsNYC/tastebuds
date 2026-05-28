@@ -431,10 +431,10 @@ export default function DashboardPage() {
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-semibold leading-none text-[color:var(--foreground)]">
-                    Places you&apos;d say yes to
+                    Places you saved
                   </h2>
                   <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                    Already saved and being watched for hosted tables.
+                    Good starting points for your first Tastebuds plan.
                   </p>
                 </div>
                 <Link className="text-sm font-semibold text-[color:var(--nav-bg)] hover:underline" href="/restaurants">
@@ -456,9 +456,9 @@ export default function DashboardPage() {
                   ))
                 ) : (
                   <div className="py-6">
-                    <h3 className="text-lg font-semibold text-[color:var(--foreground)]">No saved venues yet</h3>
+                    <h3 className="text-lg font-semibold text-[color:var(--foreground)]">Start by saving a few places</h3>
                     <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
-                      Save places you would actually attend. We will watch them for matched tables.
+                      Pick restaurants you&apos;d actually say yes to, and we&apos;ll use them to shape better suggestions.
                     </p>
                     <div className="mt-4">
                       <Button href="/restaurants">Browse restaurants</Button>
