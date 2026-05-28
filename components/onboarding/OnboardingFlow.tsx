@@ -24,6 +24,7 @@ import {
   buildAuthCallbackUrl,
   clearOnboardingActivationPending,
   clearPendingSignup,
+  clearSignupConfirmationSignal,
   getPostAuthRoute,
   hasOnboardingActivationPending,
   setOnboardingActivationPending,
@@ -440,6 +441,18 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
           return
         }
 
+        clearAppBootstrapCache()
+        clearPendingSignup()
+        clearSignupConfirmationSignal()
+        clearOnboardingActivationPending()
+        setDraft(createEmptyProfileDraft())
+        setUserId(null)
+        setEmail('')
+        setPassword('')
+        setConfirmPassword('')
+        setRestaurants([])
+        setSelectedRestaurant(null)
+        setStage('welcome-1')
         setAuthenticated(false)
         setSessionChecked(true)
         return
@@ -492,16 +505,28 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     }
 
     void bootstrapFlow().catch(() => {
-      if (active) {
-        if (mode === 'resume') {
-          router.replace('/login')
-          return
-        }
+        if (active) {
+          if (mode === 'resume') {
+            router.replace('/login')
+            return
+          }
 
-        setAuthenticated(false)
-        setSessionChecked(true)
-      }
-    })
+          clearAppBootstrapCache()
+          clearPendingSignup()
+          clearSignupConfirmationSignal()
+          clearOnboardingActivationPending()
+          setDraft(createEmptyProfileDraft())
+          setUserId(null)
+          setEmail('')
+          setPassword('')
+          setConfirmPassword('')
+          setRestaurants([])
+          setSelectedRestaurant(null)
+          setStage('welcome-1')
+          setAuthenticated(false)
+          setSessionChecked(true)
+        }
+      })
 
     return () => {
       active = false

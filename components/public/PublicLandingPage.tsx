@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
+import { LandingAuthConfirmation } from '@/components/auth/LandingAuthConfirmation'
 import type { PublicLandingTableCard } from '@/lib/app/public-landing'
 import { usePrefersReducedMotion } from '@/lib/app/use-prefers-reduced-motion'
 
@@ -169,6 +170,7 @@ export function PublicLandingPage({
 
   return (
     <main className="landing-page min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
+      <LandingAuthConfirmation />
       <header className="fixed inset-x-0 top-0 z-50">
         <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
           <div className="flex w-full items-center justify-between gap-4">
