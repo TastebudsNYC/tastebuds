@@ -202,7 +202,7 @@ export function PublicLandingPage({
             <h1 className="max-w-[620px] text-[46px] leading-[0.92] font-bold tracking-[-0.075em] text-[#111111] sm:text-[62px] lg:text-[78px]">
               Pick a vibe.
               <br />
-              Find a place.
+              Pick a place.
               <br />
               <span className="italic text-[color:var(--accent-landing)]">
                 Find a table.
