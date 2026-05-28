@@ -30,15 +30,19 @@ export function ModalShell({
   onClose: () => void
 }) {
   const [isClosing, setIsClosing] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
 
   useEffect(() => {
-    setIsMounted(true)
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      previousFocusRef.current?.focus()
+    }
   }, [])
 
   useEffect(() => {
@@ -56,7 +60,6 @@ export function ModalShell({
         }
 
         window.setTimeout(() => {
-          previousFocusRef.current?.focus()
           onClose()
         }, MODAL_CLOSE_MS)
 
@@ -109,12 +112,11 @@ export function ModalShell({
 
     setIsClosing(true)
     window.setTimeout(() => {
-      previousFocusRef.current?.focus()
       onClose()
     }, MODAL_CLOSE_MS)
   }
 
-  if (!isMounted) {
+  if (typeof document === 'undefined') {
     return null
   }
 
