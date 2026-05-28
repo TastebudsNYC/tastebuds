@@ -170,12 +170,8 @@ function StageShell({
               <span className="h-5" />
             )}
             <div className="w-full">
-              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f8dfba]">
-                <span>
-                  {currentStep}
-                  {' '} / {' '}
-                  {progressTotal}
-                </span>
+              <div className="text-right text-sm font-semibold tracking-[-0.01em] text-[color:var(--nav-bg)]">
+                Step {currentStep} of {progressTotal}
               </div>
             </div>
           </div>
@@ -767,6 +763,12 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     : `${savedRestaurantCount} saved`
   const inputClassName =
     'tb-input min-h-[4.65rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/94 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.05)]'
+  const backButtonClass =
+    'h-14 min-w-[7.75rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
+  const primaryButtonClass =
+    'h-14 min-w-[10rem] px-10 text-base shadow-[0_18px_34px_rgba(245,158,11,0.24)]'
+  const secondaryActionButtonClass =
+    'h-14 min-w-[10rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
   const canContinueFromFooter =
     stage === 'drinks'
       ? true
@@ -778,19 +780,19 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     <div className="tb-onboarding-actions">
       <div className="tb-onboarding-actions-left">
         {canGoBack ? (
-          <Button className="min-w-32" onClick={goBack} variant="secondary">
+          <Button className={backButtonClass} onClick={goBack} variant="secondary">
             Back
           </Button>
         ) : (
           <span />
         )}
         {stage === 'bio' ? (
-          <Button onClick={() => continueTo()} variant="ghost">
+          <Button className="h-14 px-8 text-base" onClick={() => continueTo()} variant="ghost">
             Skip for now
           </Button>
         ) : null}
         {stage === 'restaurants' ? (
-          <Button onClick={handleActivationContinue} variant="ghost">
+          <Button className="h-14 px-8 text-base" onClick={handleActivationContinue} variant="ghost">
             Skip for now
           </Button>
         ) : null}
@@ -808,24 +810,24 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
         {stage === 'finish' ? (
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button href="/profile" variant="secondary">
+            <Button className={secondaryActionButtonClass} href="/profile" variant="secondary">
               Edit full profile
             </Button>
-            <Button className="min-w-44" href="/dashboard">
+            <Button className={primaryButtonClass} href="/dashboard">
               See my dashboard
             </Button>
           </div>
         ) : stage === 'account-password' ? (
-          <Button className="min-w-44" disabled={loading} onClick={() => void handleCreateAccount()}>
+          <Button className={primaryButtonClass} disabled={loading} onClick={() => void handleCreateAccount()}>
             {loading ? 'Creating account...' : 'Create account'}
           </Button>
         ) : stage === 'group-age' ? (
-          <Button className="min-w-44" disabled={loading || disableContinue} onClick={() => void handleFinishSetup()}>
+          <Button className={primaryButtonClass} disabled={loading || disableContinue} onClick={() => void handleFinishSetup()}>
             {loading ? 'Saving profile...' : 'Continue'}
           </Button>
         ) : stage === 'restaurants' ? (
           <Button
-            className="min-w-44"
+            className={primaryButtonClass}
             disabled={restaurantSelectionRequired && savedRestaurantCount < 2}
             onClick={handleActivationContinue}
           >
@@ -833,7 +835,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
           </Button>
         ) : (
           <Button
-            className="min-w-40"
+            className={primaryButtonClass}
             disabled={!canContinueFromFooter}
             onClick={() => continueTo()}
           >
