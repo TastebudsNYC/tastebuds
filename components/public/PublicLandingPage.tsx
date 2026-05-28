@@ -170,20 +170,17 @@ export function PublicLandingPage({
   return (
     <main className="landing-page min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="fixed inset-x-0 top-0 z-50">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
-            <Link aria-label="Tastebuds home" href="/">
-              <Image
-                alt="Tastebuds"
-                className="h-auto w-[148px] lg:w-[220px]"
-                height={71}
-                priority
-                src="/assets/tastebuds_logo_dark_header_transparent.png"
-                width={220}
-              />
-            </Link>
-          </div>
-          <div className="landing-nav hidden h-[52px] lg:block" />
+        <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
+          <Link aria-label="Tastebuds home" href="/">
+            <Image
+              alt="Tastebuds"
+              className="h-auto w-[148px] lg:w-[220px]"
+              height={71}
+              priority
+              src="/assets/tastebuds_logo_dark_header_transparent.png"
+              width={220}
+            />
+          </Link>
         </div>
       </header>
 
@@ -217,7 +214,7 @@ export function PublicLandingPage({
           </div>
         </div>
 
-        <div className="relative min-h-[420px] overflow-hidden bg-[color:var(--nav-bg)] pt-[52px]">
+        <div className="relative min-h-[420px] overflow-hidden bg-[color:var(--nav-bg)] pt-[72px] lg:pt-[108px]">
           <div className="landing-hero-fallback absolute inset-0" />
           {heroSlides.map((slide, index) => (
             <div
