@@ -133,6 +133,7 @@ const PROFILE_STAGE_SEQUENCE: StageId[] = [
 function StageShell({
   children,
   currentStep,
+  direction,
   footer,
   progressTotal,
   showLoginLink = true,
@@ -140,6 +141,7 @@ function StageShell({
 }: {
   children: React.ReactNode
   currentStep: number
+  direction: -1 | 1
   footer: React.ReactNode
   progressTotal: number
   showLoginLink?: boolean
@@ -151,7 +153,7 @@ function StageShell({
   return (
     <main className={`tb-onboarding-shell ${stageAccent}`}>
       <div className="tb-onboarding-backdrop" />
-      <div className="relative flex min-h-screen flex-col">
+      <div className="relative min-h-screen">
         <header className="tb-onboarding-header">
           <TastebudsLogo showTagline={false} size="sm" theme="dark" />
           <div className="flex min-w-[180px] flex-col items-end gap-2">
@@ -186,7 +188,12 @@ function StageShell({
         </div>
 
         <section className="tb-onboarding-main">
-          <div className="tb-onboarding-step" key={stageId}>
+          <div
+            className={`tb-onboarding-step ${
+              direction < 0 ? 'tb-onboarding-step-back' : 'tb-onboarding-step-forward'
+            }`}
+            key={stageId}
+          >
             <div className="tb-onboarding-content">
               {children}
             </div>
@@ -211,16 +218,16 @@ function StageHeading({
   subtext: string
 }) {
   return (
-    <div className="space-y-4 text-center lg:text-left">
+    <div className="space-y-4 text-center">
       {eyebrow ? (
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--accent-strong)]">
+        <p className="hidden text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--accent-strong)]">
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="text-[2.85rem] font-bold leading-[0.92] tracking-[-0.07em] text-[color:var(--foreground)] sm:text-[3.5rem] lg:text-[4.25rem]">
+      <h1 className="text-[3rem] font-bold leading-[0.92] tracking-[-0.07em] text-[color:var(--foreground)] sm:text-[3.8rem] lg:text-[4.85rem]">
         {heading}
       </h1>
-      <p className="mx-auto max-w-[44rem] text-lg leading-8 text-[color:var(--text-secondary)] lg:mx-0">
+      <p className="mx-auto max-w-[46rem] text-lg leading-8 text-[color:var(--text-secondary)] lg:text-[1.35rem]">
         {subtext}
       </p>
     </div>
@@ -443,6 +450,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [direction, setDirection] = useState<1 | -1>(1)
   const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
@@ -572,12 +580,14 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       return
     }
 
+    setDirection(-1)
     setError('')
     setMessage('')
     setStage(visibleStages[currentStageIndex - 1] ?? visibleStages[0]!)
   }
 
   function continueTo(nextStage?: StageId) {
+    setDirection(1)
     setError('')
     setMessage('')
 
@@ -638,6 +648,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     clearPendingSignup()
     setAuthenticated(true)
     setUserId(data.session.user.id)
+    setDirection(1)
     setStage('display-name')
   }
 
@@ -659,6 +670,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       const payload = await fetchRestaurants()
       const nextRestaurants = payload.restaurants ?? []
       setRestaurants(nextRestaurants)
+      setDirection(1)
       setStage('restaurants')
     } catch (nextError) {
       const message =
@@ -721,6 +733,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   function handleActivationContinue() {
     clearOnboardingActivationPending()
 
+    setDirection(1)
     setStage('finish')
   }
 
@@ -728,6 +741,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     return (
       <StageShell
         currentStep={1}
+        direction={1}
         footer={<div />}
         progressTotal={visibleStages.length}
         showLoginLink={!authenticated}
@@ -836,6 +850,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   return (
     <StageShell
       currentStep={currentStep}
+      direction={direction}
       footer={footer}
       progressTotal={visibleStages.length}
       showLoginLink={!authenticated}
