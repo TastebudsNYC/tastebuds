@@ -4,12 +4,25 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
+import type { PublicLandingTableCard } from '@/lib/app/public-landing'
 import { usePrefersReducedMotion } from '@/lib/app/use-prefers-reduced-motion'
 
 const heroSlides = [
-  'landing-hero-slide-steakhouse',
-  'landing-hero-slide-brunch',
-  'landing-hero-slide-ramen',
+  {
+    alt: 'Friends sharing dinner at a restaurant table',
+    imageSrc: '/assets/landing/pexels-cedric-fauntleroy-7221225.jpg',
+    slideClass: 'landing-hero-slide-steakhouse',
+  },
+  {
+    alt: 'People toasting drinks over brunch',
+    imageSrc: '/assets/landing/pexels-veneka-dziruni-812159966-36861445.jpg',
+    slideClass: 'landing-hero-slide-brunch',
+  },
+  {
+    alt: 'Dining room with food and warm ambient lighting',
+    imageSrc: '/assets/landing/pexels-isabeu-18556882.jpg',
+    slideClass: 'landing-hero-slide-ramen',
+  },
 ]
 
 const steps = [
@@ -48,33 +61,6 @@ const matchingInputs = [
   },
 ]
 
-const tableCards = [
-  {
-    emoji: '🥩',
-    title: "Gallagher's Steakhouse",
-    meta: 'Midtown · Wednesday dinner',
-    tagline: 'Old-school steakhouse. Big-table dinner energy.',
-    status: '2 seats left',
-    visualClass: 'landing-event-visual-steak',
-  },
-  {
-    emoji: '🍸',
-    title: 'Banter NYC',
-    meta: 'Lower East Side · Sunday brunch',
-    tagline: 'Bright brunch spot. Easy first-table energy.',
-    status: 'open',
-    visualClass: 'landing-event-visual-brunch',
-  },
-  {
-    emoji: '🍜',
-    title: 'Raku',
-    meta: 'Midtown · Friday dinner',
-    tagline: 'Low-key ramen. Good food, no performance.',
-    status: '3 seats left',
-    visualClass: 'landing-event-visual-ramen',
-  },
-]
-
 const matchRows = [
   { label: 'Cuisine', value: 95 },
   { label: 'Vibe', value: 90 },
@@ -82,7 +68,11 @@ const matchRows = [
   { label: 'Setting', value: 82 },
 ]
 
-export function PublicLandingPage() {
+export function PublicLandingPage({
+  tableCards,
+}: {
+  tableCards: PublicLandingTableCard[]
+}) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const [activeSlide, setActiveSlide] = useState(0)
   const [matchCount, setMatchCount] = useState(0)
@@ -179,23 +169,26 @@ export function PublicLandingPage() {
 
   return (
     <main className="landing-page min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
-      <header className="landing-nav fixed inset-x-0 top-0 z-50">
-        <div className="mx-auto flex h-[52px] w-full max-w-[1440px] items-center justify-between px-6 lg:px-12">
-          <Link aria-label="Tastebuds home" href="/">
-            <Image
-              alt="Tastebuds"
-              className="h-8 w-auto"
-              height={32}
-              priority
-              src="/assets/tastebuds_logo_dark_header_transparent.png"
-              width={99}
-            />
-          </Link>
+      <header className="fixed inset-x-0 top-0 z-50">
+        <div className="mx-auto grid max-w-[1440px] grid-cols-1 lg:grid-cols-2">
+          <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
+            <Link aria-label="Tastebuds home" href="/">
+              <Image
+                alt="Tastebuds"
+                className="h-auto w-[148px] lg:w-[220px]"
+                height={71}
+                priority
+                src="/assets/tastebuds_logo_dark_header_transparent.png"
+                width={220}
+              />
+            </Link>
+          </div>
+          <div className="landing-nav hidden h-[52px] lg:block" />
         </div>
       </header>
 
-      <section className="grid min-h-screen grid-cols-1 overflow-hidden pt-[52px] lg:grid-cols-2">
-        <div className="flex flex-col justify-center bg-white px-6 py-16 lg:px-[72px] lg:py-0 lg:pr-[60px]">
+      <section className="grid min-h-screen grid-cols-1 overflow-hidden lg:grid-cols-2">
+        <div className="flex flex-col justify-center bg-white px-6 pt-[132px] pb-16 lg:px-[72px] lg:pt-[140px] lg:pb-0 lg:pr-[60px]">
           <div className="landing-reveal is-visible" data-landing-reveal>
             <h1 className="max-w-[620px] text-[46px] leading-[0.92] font-bold tracking-[-0.075em] text-[#111111] sm:text-[62px] lg:text-[78px]">
               Pick a vibe.
@@ -224,30 +217,36 @@ export function PublicLandingPage() {
           </div>
         </div>
 
-        <div className="relative min-h-[420px] overflow-hidden bg-[color:var(--nav-bg)]">
+        <div className="relative min-h-[420px] overflow-hidden bg-[color:var(--nav-bg)] pt-[52px]">
           <div className="landing-hero-fallback absolute inset-0" />
-          {heroSlides.map((slideClass, index) => (
+          {heroSlides.map((slide, index) => (
             <div
               aria-hidden="true"
               className={[
                 'landing-hero-slide absolute inset-0',
-                slideClass,
+                slide.slideClass,
                 index === activeSlide || (prefersReducedMotion && index === 0)
                   ? 'is-active'
                   : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
-              key={slideClass}
-            />
+              key={slide.imageSrc}
+            >
+              <Image
+                alt={slide.alt}
+                className="h-full w-full object-cover"
+                fill
+                priority={index === 0}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                src={slide.imageSrc}
+              />
+            </div>
           ))}
           <div
             aria-hidden="true"
             className="absolute inset-0 bg-black/25"
           />
-          <div className="absolute inset-x-6 bottom-6 z-10 max-w-[320px] rounded-2xl border border-white/12 bg-white/8 p-4 text-sm text-white/70 backdrop-blur-sm lg:inset-x-auto lg:right-8">
-            Photo placeholder. Add local hero images under `/public/assets/landing/`.
-          </div>
         </div>
       </section>
 
