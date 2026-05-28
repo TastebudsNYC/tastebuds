@@ -1,22 +1,23 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { AuthShell } from '@/components/app/AuthShell'
 import { Button } from '@/components/app/Button'
-import { getAppBootstrap } from '@/lib/app/client'
-import { isProfileComplete } from '@/lib/app/format'
+import { clearAppBootstrapCache } from '@/lib/app/client'
+import {
+  clearPendingSignup,
+  getPendingSignup,
+  getPostAuthRoute,
+} from '@/lib/auth/onboarding'
 import { supabase } from '@/lib/supabase/client'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [error, setError] = useState('')
-
-  async function getPostAuthRoute() {
-    const bootstrap = await getAppBootstrap()
-    return isProfileComplete(bootstrap.profile) ? '/dashboard' : '/onboarding'
-  }
+  const isSignupFlow = searchParams.get('flow') === 'signup'
 
   useEffect(() => {
     let active = true
@@ -24,6 +25,8 @@ export default function AuthCallbackPage() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (active && session) {
+          clearAppBootstrapCache()
+          clearPendingSignup()
           void getPostAuthRoute().then((route) => router.replace(route))
         }
       }
@@ -34,6 +37,7 @@ export default function AuthCallbackPage() {
       const authCode = searchParams.get('code')
       const authError =
         searchParams.get('error_description') ?? searchParams.get('error')
+      const isSignupFlow = searchParams.get('flow') === 'signup'
 
       if (authError) {
         if (active) {
@@ -54,6 +58,8 @@ export default function AuthCallbackPage() {
         }
 
         if (active) {
+          clearAppBootstrapCache()
+          clearPendingSignup()
           router.replace(await getPostAuthRoute())
         }
         return
@@ -72,7 +78,19 @@ export default function AuthCallbackPage() {
       }
 
       if (session) {
+        clearAppBootstrapCache()
+        clearPendingSignup()
         router.replace(await getPostAuthRoute())
+        return
+      }
+
+      if (active && isSignupFlow) {
+        const pendingEmail = getPendingSignup()?.email
+        router.replace(
+          pendingEmail
+            ? `/signup/continue?email=${encodeURIComponent(pendingEmail)}`
+            : '/signup/continue'
+        )
         return
       }
 
@@ -117,8 +135,8 @@ export default function AuthCallbackPage() {
       {error ? (
         <div className="mt-6 space-y-4 rounded-3xl border border-[color:color-mix(in_srgb,var(--accent)_28%,white)] bg-[color:color-mix(in_srgb,var(--accent)_10%,var(--surface))] p-5 text-sm text-[color:var(--accent-strong)]">
           <p>{error}</p>
-          <Button href="/login" variant="secondary">
-            Go back to login
+          <Button href={isSignupFlow ? '/signup/continue' : '/login'} variant="secondary">
+            {isSignupFlow ? 'Continue onboarding' : 'Go back to login'}
           </Button>
         </div>
       ) : (

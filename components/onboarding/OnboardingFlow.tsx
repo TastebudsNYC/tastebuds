@@ -21,6 +21,15 @@ import {
 } from '@/lib/app/client'
 import { isProfileComplete } from '@/lib/app/format'
 import {
+  buildAuthCallbackUrl,
+  clearOnboardingActivationPending,
+  clearPendingSignup,
+  getPostAuthRoute,
+  hasOnboardingActivationPending,
+  setOnboardingActivationPending,
+  setPendingSignup,
+} from '@/lib/auth/onboarding'
+import {
   AGE_RANGE_COMFORT_TAGS,
   CONVERSATION_ACTIVITY_TAGS,
   CROWD_TAGS,
@@ -71,7 +80,6 @@ type StageId =
   | 'restaurants'
   | 'finish'
 
-const ONBOARDING_ACTIVATION_KEY = 'tastebuds:onboarding-activation-pending'
 const ONBOARDING_RESTAURANT_IMAGES = [
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDCoHML1D-nS9Lpd8JQsgkHZQy7xiCa4Cx9EeNcbmIe5Kp0jdxofD_dVVn6Ze22xEPoZgJTuKre5B1fsb1Pbbme3gUS-P9eUKSbS3DQQs4TkPqXXH3lEx8hArTWwf3eLo4jmiZBqoc5svsyFDFqKkvvC_rj4reYIojqZPtWbKTLiBugXIwtxa9qGGkVZ1Qvn7lEgs5cvkJpPYEypfeu3_hwcW_FJI1Rnh9Ib_QPpp-r_W-cmqmkxuliA_xVq0jvZHb9l0FtG2aimNlH',
   'https://lh3.googleusercontent.com/aida-public/AB6AXuAslHXH8KjoZPnFH9tLgGOz8rpffzYp31oJCQ03BpWAGdwlFuUFHoISTgdAoZH_NjW-csUz083j3OW2m7Eg3SuZatWjxorJGliozLUIdLQ8c8z6hpL2bj-HYYYYraZ1M28INpoA-BFsk74mlHt5pUxujHqONyF7wwIBG2LeEI48EBwtXkT82xYxLlx3ZfU9xA0fKFD9uG5VwLYImjp2Ds_E_MAAvem_kn52S1La_X3JIpw26-1BtApNmFDKsn5tXXeqRiG9EglOZ9X-',
@@ -414,8 +422,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
   const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-
   useEffect(() => {
     let active = true
 
@@ -445,13 +451,11 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         return
       }
 
-      const activationPending =
-        typeof window !== 'undefined' &&
-        window.sessionStorage.getItem(ONBOARDING_ACTIVATION_KEY) === 'pending'
+      const activationPending = hasOnboardingActivationPending()
 
       if (isProfileComplete(bootstrap.profile)) {
         if (!activationPending) {
-          router.replace('/dashboard')
+          router.replace(await getPostAuthRoute())
           return
         }
       }
@@ -509,13 +513,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const currentStep = currentStageIndex + 1
   const canGoBack = currentStageIndex > 0
 
-  function getAuthRedirectUrl() {
-    const baseUrl =
-      appUrl.trim().length > 0 ? appUrl.replace(/\/+$/, '') : window.location.origin
-
-    return `${baseUrl}/auth/callback`
-  }
-
   function goBack() {
     if (!canGoBack) {
       return
@@ -560,28 +557,31 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     setLoading(true)
     setError('')
     setMessage('')
+    setPendingSignup(email.trim())
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: getAuthRedirectUrl(),
+        emailRedirectTo: buildAuthCallbackUrl(process.env.NEXT_PUBLIC_APP_URL, 'signup'),
       },
     })
 
     setLoading(false)
 
     if (signUpError) {
+      clearPendingSignup()
       setError(signUpError.message)
       return
     }
 
     if (!data.session?.user) {
-      setMessage('Check your email to confirm your account, then log in to continue.')
+      router.replace(`/signup/check-email?email=${encodeURIComponent(email.trim())}`)
       return
     }
 
     clearAppBootstrapCache()
+    clearPendingSignup()
     setAuthenticated(true)
     setUserId(data.session.user.id)
     setStage('display-name')
@@ -599,9 +599,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     try {
       await saveProfileDraft(supabase, userId, draft)
       clearAppBootstrapCache()
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(ONBOARDING_ACTIVATION_KEY, 'pending')
-      }
+      setOnboardingActivationPending()
 
       setRestaurantsLoading(true)
       const payload = await fetchRestaurants()
@@ -653,9 +651,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   }
 
   function handleActivationContinue() {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(ONBOARDING_ACTIVATION_KEY)
-    }
+    clearOnboardingActivationPending()
 
     setStage('finish')
   }
