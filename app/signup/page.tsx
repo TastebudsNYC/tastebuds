@@ -6,22 +6,28 @@ import { useEffect, useState } from 'react'
 
 import { AuthShell } from '@/components/app/AuthShell'
 import { Button } from '@/components/app/Button'
+import { getAppBootstrap } from '@/lib/app/client'
+import { isProfileComplete } from '@/lib/app/format'
 import { supabase } from '@/lib/supabase/client'
+
+async function getPostAuthRoute() {
+  const bootstrap = await getAppBootstrap()
+  return isProfileComplete(bootstrap.profile) ? '/dashboard' : '/onboarding'
+}
 
 export default function SignupPage() {
   const router = useRouter()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   function getAuthRedirectUrl() {
-    const baseUrl =
-      appUrl.trim().length > 0
-        ? appUrl.replace(/\/+$/, '')
-        : window.location.origin
+    const baseUrl = appUrl.trim().length > 0 ? appUrl.replace(/\/+$/, '') : window.location.origin
 
     return `${baseUrl}/auth/callback`
   }
@@ -35,7 +41,7 @@ export default function SignupPage() {
       } = await supabase.auth.getUser()
 
       if (active && user) {
-        router.replace('/dashboard')
+        router.replace(await getPostAuthRoute())
       }
     }
 
@@ -56,6 +62,9 @@ export default function SignupPage() {
       email,
       password,
       options: {
+        data: {
+          display_name: name.trim(),
+        },
         emailRedirectTo: getAuthRedirectUrl(),
       },
     })
@@ -68,82 +77,118 @@ export default function SignupPage() {
     }
 
     if (data.session) {
-      router.replace('/dashboard')
+      router.replace('/onboarding')
       return
     }
 
-    setMessage(
-      'Check your email to confirm your account, then come back and log in.'
-    )
+    setMessage('Check your email to confirm your account, then continue into your taste profile.')
+  }
+
+  async function handleGoogleSignup() {
+    setOauthLoading(true)
+    setError('')
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: getAuthRedirectUrl(),
+      },
+    })
+
+    if (oauthError) {
+      setError(oauthError.message)
+      setOauthLoading(false)
+    }
   }
 
   return (
     <AuthShell
       aside={
         <>
-          <div>
-            <p className="tb-label text-sm font-medium uppercase tracking-[0.24em]">
-              New account
-            </p>
-            <h1 className="mt-5 text-5xl font-semibold tracking-tight text-[color:var(--foreground)]">
-              Build the profile that shapes your next table.
-            </h1>
-            <p className="tb-copy mt-6 max-w-xl text-lg leading-8">
-              Start with a simple account, then tell Tastebuds what kind of dinner actually feels right.
-            </p>
-          </div>
-          <div className="tb-panel mt-8 rounded-3xl p-6">
-            <p className="tb-label text-xs font-medium uppercase tracking-[0.16em]">
-              What happens next
-            </p>
-            <ul className="tb-copy mt-4 space-y-3 text-sm leading-6">
-              <li>Create account and confirm email if required</li>
-              <li>Complete your taste profile and home area</li>
-              <li>Start saving restaurants and joining the right tables</li>
-            </ul>
-          </div>
+          <h1 className="mt-5 text-5xl font-semibold tracking-tight text-[color:var(--foreground)]">
+            Start your taste profile.
+          </h1>
+          <p className="tb-copy mt-6 max-w-xl text-lg leading-8">
+            Tell us the kind of restaurants and tables you&apos;d actually say yes to.
+          </p>
         </>
       }
+      asideCard={
+        <>
+          <p className="tb-label text-xs font-medium uppercase tracking-[0.16em]">
+            What happens next
+          </p>
+          <ul className="tb-copy mt-4 space-y-3 text-sm leading-6">
+            <li>Set up your taste profile</li>
+            <li>Save venues you&apos;d actually attend</li>
+            <li>Watch for hosted tables that fit</li>
+          </ul>
+        </>
+      }
+      asideTitle="New account"
       title="Sign up"
     >
       <p className="tb-label text-sm font-medium uppercase tracking-[0.2em]">Create account</p>
-      <h1 className="mt-3 text-3xl font-semibold text-[color:var(--foreground)]">Start with your login</h1>
+      <h1 className="mt-3 text-3xl font-semibold text-[color:var(--foreground)]">Start your taste profile.</h1>
       <p className="tb-copy mt-3 text-sm leading-6">
-        Start with email and password. You can finish the rest of your profile after signup.
+        Tell us the kind of restaurants and tables you&apos;d actually say yes to.
       </p>
 
-      <form onSubmit={handleSignup} className="mt-8 space-y-4">
+      <form className="mt-8 space-y-4" onSubmit={handleSignup}>
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-[color:var(--foreground)]">Name</span>
+          <input
+            autoComplete="name"
+            className="tb-input"
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Alex"
+            required
+            type="text"
+            value={name}
+          />
+        </label>
+
         <label className="block space-y-2">
           <span className="text-sm font-medium text-[color:var(--foreground)]">Email</span>
           <input
-            className="tb-input"
-            type="email"
             autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
+            className="tb-input"
             onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
             required
+            type="email"
+            value={email}
           />
         </label>
 
         <label className="block space-y-2">
           <span className="text-sm font-medium text-[color:var(--foreground)]">Password</span>
           <input
-            className="tb-input"
-            type="password"
             autoComplete="new-password"
+            className="tb-input"
             minLength={6}
-            placeholder="At least 6 characters"
-            value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="At least 6 characters"
             required
+            type="password"
+            value={password}
           />
         </label>
 
-        <Button className="w-full" disabled={loading} type="submit">
-          {loading ? 'Creating account...' : 'Sign up'}
+        <Button className="w-full" disabled={loading || oauthLoading} type="submit">
+          {loading ? 'Creating account...' : 'Create account'}
         </Button>
       </form>
+
+      <Button
+        className="mt-4 w-full"
+        disabled={loading || oauthLoading}
+        onClick={handleGoogleSignup}
+        type="button"
+        variant="secondary"
+      >
+        {oauthLoading ? 'Redirecting to Google...' : 'Continue with Google'}
+      </Button>
 
       {error ? (
         <p className="mt-4 rounded-2xl border border-[color:color-mix(in_srgb,var(--accent)_28%,white)] bg-[color:color-mix(in_srgb,var(--accent)_10%,var(--surface))] p-3 text-sm text-[color:var(--accent-strong)]">

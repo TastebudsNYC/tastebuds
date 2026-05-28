@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server'
 
 import {
   calculateDistanceKm,
-  calculateRestaurantMatchScore,
-  describeVenueMatch,
-  type EventForScoring,
   type ProfileForScoring,
 } from '@/lib/events'
+import {
+  buildVenueDataModel,
+  deriveVenueTraits,
+  mapVenueTraitsRow,
+} from '@/lib/venues/enrichment'
+import { buildVenueMatchResult, pickDistinctExplanation } from '@/lib/venues/match'
+import type { VenueTraitsRow } from '@/lib/venues/types'
 import {
   createServerSupabaseAdminClient,
   getUserFromAccessToken,
@@ -40,16 +44,20 @@ type ProfileRow = {
 type RestaurantRow = {
   cuisines: string[] | null
   formatted_address: string | null
+  google_business_status: string | null
   google_editorial_summary: string | null
   google_good_for_groups: boolean | null
   google_good_for_watching_sports: boolean | null
+  google_last_synced_at: string | null
   google_live_music: boolean | null
   google_maps_uri: string | null
   google_open_now: boolean | null
   google_opening_hours: string[] | null
   google_outdoor_seating: boolean | null
+  google_photo_refs: string[] | null
   google_place_id: string | null
   google_price_level: string | null
+  google_primary_type: string | null
   google_rating: number | null
   google_reservable: boolean | null
   google_serves_beer: boolean | null
@@ -59,6 +67,7 @@ type RestaurantRow = {
   google_serves_dinner: boolean | null
   google_serves_vegetarian_food: boolean | null
   google_serves_wine: boolean | null
+  google_types: string[] | null
   google_user_ratings_total: number | null
   google_website_uri: string | null
   id: number
@@ -105,6 +114,10 @@ type MySignupRow = {
   status: 'going' | 'cancelled' | 'removed' | 'no_show' | 'attended'
 }
 
+function isFutureOpenEvent(event: EventRow, referenceTime: number) {
+  return event.status === 'open' && new Date(event.starts_at).getTime() > referenceTime
+}
+
 function parseBearerToken(request: Request) {
   const authorization = request.headers.get('authorization')
 
@@ -125,6 +138,7 @@ export async function GET(request: Request) {
   try {
     const user = await getUserFromAccessToken(token)
     const adminClient = createServerSupabaseAdminClient()
+    const now = Date.now()
 
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
@@ -168,7 +182,7 @@ export async function GET(request: Request) {
       adminClient
         .from('restaurants')
         .select(
-          'cuisines, formatted_address, google_editorial_summary, google_good_for_groups, google_good_for_watching_sports, google_live_music, google_maps_uri, google_open_now, google_opening_hours, google_outdoor_seating, google_place_id, google_price_level, google_rating, google_reservable, google_serves_beer, google_serves_brunch, google_serves_cocktails, google_serves_dessert, google_serves_dinner, google_serves_vegetarian_food, google_serves_wine, google_user_ratings_total, google_website_uri, id, menu_experience_tags, name, neighbourhood, subregion, venue_crowd, venue_energy, venue_formats, venue_good_for_casual_meetups, venue_good_for_cocktails, venue_good_for_conversation, venue_good_for_dinner, venue_group_friendly, venue_indoor_outdoor, venue_latitude, venue_longitude, venue_music, venue_noise_level, venue_price, venue_reservation_friendly, venue_scene, venue_seating_types, venue_setting, venue_vibes'
+          'cuisines, formatted_address, google_business_status, google_editorial_summary, google_good_for_groups, google_good_for_watching_sports, google_last_synced_at, google_live_music, google_maps_uri, google_open_now, google_opening_hours, google_outdoor_seating, google_photo_refs, google_place_id, google_price_level, google_primary_type, google_rating, google_reservable, google_serves_beer, google_serves_brunch, google_serves_cocktails, google_serves_dessert, google_serves_dinner, google_serves_vegetarian_food, google_serves_wine, google_types, google_user_ratings_total, google_website_uri, id, menu_experience_tags, name, neighbourhood, subregion, venue_crowd, venue_energy, venue_formats, venue_good_for_casual_meetups, venue_good_for_cocktails, venue_good_for_conversation, venue_good_for_dinner, venue_group_friendly, venue_indoor_outdoor, venue_latitude, venue_longitude, venue_music, venue_noise_level, venue_price, venue_reservation_friendly, venue_scene, venue_seating_types, venue_setting, venue_vibes'
         )
         .is('archived_at', null)
         .order('name', { ascending: true })
@@ -179,7 +193,7 @@ export async function GET(request: Request) {
         .select('id, restaurant_id, starts_at, status, title, viability_status')
         .neq('status', 'cancelled')
         .is('archived_at', null)
-        .gte('starts_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .gte('starts_at', new Date(now).toISOString())
         .order('starts_at', { ascending: true })
         .returns<EventRow[]>(),
       adminClient
@@ -241,6 +255,24 @@ export async function GET(request: Request) {
       (mySignupsResponse.data ?? []).map((signup) => [signup.event_id, signup.status])
     )
     const eventsByRestaurantId = new Map<number, EventRow[]>()
+    const venueTraitsByRestaurantId = new Map<number, VenueTraitsRow>()
+    const restaurantIds = (restaurantsResponse.data ?? []).map((restaurant) => restaurant.id)
+
+    if (restaurantIds.length > 0) {
+      const { data: venueTraits, error: venueTraitsError } = await adminClient
+        .from('venue_traits')
+        .select(
+          'restaurant_id, cuisine_tags, vibe_tags, setting_tags, social_fit_tags, price_band, confidence_score, source, generated_at'
+        )
+        .in('restaurant_id', restaurantIds)
+        .returns<VenueTraitsRow[]>()
+
+      if (!venueTraitsError) {
+        for (const row of venueTraits ?? []) {
+          venueTraitsByRestaurantId.set(row.restaurant_id, row)
+        }
+      }
+    }
 
     for (const event of eventsResponse.data ?? []) {
       if (event.restaurant_id === null) {
@@ -253,51 +285,10 @@ export async function GET(request: Request) {
       ])
     }
 
+    const explanationSet = new Set<string>()
+
     const restaurants = (restaurantsResponse.data ?? [])
       .map((restaurant) => {
-        const scoringRestaurant: EventForScoring = {
-          google_good_for_groups: restaurant.google_good_for_groups,
-          google_good_for_watching_sports: restaurant.google_good_for_watching_sports,
-          google_live_music: restaurant.google_live_music,
-          google_open_now: restaurant.google_open_now,
-          google_opening_hours: restaurant.google_opening_hours,
-          google_outdoor_seating: restaurant.google_outdoor_seating,
-          google_price_level: restaurant.google_price_level,
-          google_rating: restaurant.google_rating,
-          google_reservable: restaurant.google_reservable,
-          google_review_count: restaurant.google_user_ratings_total,
-          google_serves_beer: restaurant.google_serves_beer,
-          google_serves_brunch: restaurant.google_serves_brunch,
-          google_serves_cocktails: restaurant.google_serves_cocktails,
-          google_serves_dessert: restaurant.google_serves_dessert,
-          google_serves_dinner: restaurant.google_serves_dinner,
-          google_serves_vegetarian_food: restaurant.google_serves_vegetarian_food,
-          google_serves_wine: restaurant.google_serves_wine,
-          intent: profile.intent ?? 'friendship',
-          menu_experience_tags: restaurant.menu_experience_tags,
-          restaurant_cuisines: restaurant.cuisines,
-          restaurant_subregion: restaurant.subregion,
-          venue_crowd: restaurant.venue_crowd,
-          venue_energy: restaurant.venue_energy,
-          venue_formats: restaurant.venue_formats,
-          venue_good_for_casual_meetups: restaurant.venue_good_for_casual_meetups,
-          venue_good_for_cocktails: restaurant.venue_good_for_cocktails,
-          venue_good_for_conversation: restaurant.venue_good_for_conversation,
-          venue_good_for_dinner: restaurant.venue_good_for_dinner,
-          venue_group_friendly: restaurant.venue_group_friendly,
-          venue_indoor_outdoor: restaurant.venue_indoor_outdoor,
-          venue_latitude: restaurant.venue_latitude,
-          venue_longitude: restaurant.venue_longitude,
-          venue_music: restaurant.venue_music,
-          venue_noise_level: restaurant.venue_noise_level,
-          venue_price: restaurant.venue_price,
-          venue_reservation_friendly: restaurant.venue_reservation_friendly,
-          venue_scene: restaurant.venue_scene,
-          venue_seating_types: restaurant.venue_seating_types,
-          venue_setting: restaurant.venue_setting,
-          venue_vibes: restaurant.venue_vibes,
-        }
-
         const restaurantEvents = eventsByRestaurantId.get(restaurant.id) ?? []
         const isSaved = savedRestaurantIds.has(restaurant.id)
         const hasJoinedEventAtRestaurant = restaurantEvents.some(
@@ -306,7 +297,7 @@ export async function GET(request: Request) {
         const canShowRestaurantEvents = isSaved || hasJoinedEventAtRestaurant
         const availableEvents = canShowRestaurantEvents
           ? restaurantEvents
-          .filter((event) => event.status === 'open')
+          .filter((event) => isFutureOpenEvent(event, now))
           .slice(0, 3)
           .map((event) => ({
             id: event.id,
@@ -331,6 +322,26 @@ export async function GET(request: Request) {
                 ).toFixed(1)
               )
             : null
+        const venue = {
+          ...buildVenueDataModel(restaurant),
+          lastSyncedAt: restaurant.google_last_synced_at,
+        }
+        const traits =
+          mapVenueTraitsRow(venueTraitsByRestaurantId.get(restaurant.id)) ??
+          deriveVenueTraits(restaurant)
+        const match = buildVenueMatchResult({
+          availableEventCount: availableEvents.length,
+          profile: scoringProfile,
+          restaurant,
+          traits,
+          venue,
+        })
+        const distinctExplanation = pickDistinctExplanation(explanationSet, match, {
+          availableEventCount: availableEvents.length,
+          profile: scoringProfile,
+          traits,
+          venue,
+        })
 
         return {
           availableEvents,
@@ -359,12 +370,14 @@ export async function GET(request: Request) {
           googleWebsiteUri: restaurant.google_website_uri,
           id: restaurant.id,
           isSaved,
-          matchScore: calculateRestaurantMatchScore(scoringProfile, scoringRestaurant),
+          matchScore: match.matchScore,
+          matchTags: match.matchTags,
           menu_experience_tags: restaurant.menu_experience_tags,
           name: restaurant.name,
           neighbourhood: restaurant.neighbourhood,
           restaurant_cuisines: restaurant.cuisines,
           subregion: restaurant.subregion,
+          topMatchFactors: match.topMatchFactors,
           venue_latitude: restaurant.venue_latitude,
           venue_longitude: restaurant.venue_longitude,
           venueDistanceKm,
@@ -375,7 +388,7 @@ export async function GET(request: Request) {
           venue_good_for_dinner: restaurant.venue_good_for_dinner,
           venue_group_friendly: restaurant.venue_group_friendly,
           venue_indoor_outdoor: restaurant.venue_indoor_outdoor,
-          venueMatchSummary: describeVenueMatch(scoringProfile, scoringRestaurant),
+          venueMatchSummary: distinctExplanation,
           venue_crowd: restaurant.venue_crowd,
           venue_energy: restaurant.venue_energy,
           venue_music: restaurant.venue_music,
@@ -389,10 +402,6 @@ export async function GET(request: Request) {
         }
       })
       .sort((left, right) => {
-        if (Number(right.isSaved) !== Number(left.isSaved)) {
-          return Number(right.isSaved) - Number(left.isSaved)
-        }
-
         if (right.matchScore !== left.matchScore) {
           return right.matchScore - left.matchScore
         }

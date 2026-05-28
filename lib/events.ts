@@ -152,6 +152,23 @@ export type PersonalScore = {
   summary: string
 }
 
+const MATCH_FACTOR_LABELS: Record<keyof VenueMatchBreakdown, string> = {
+  conversation: 'conversation',
+  crowd: 'crowd',
+  cuisine: 'cuisine',
+  dietary: 'dietary fit',
+  drinking: 'drinks',
+  energy: 'energy',
+  groupSize: 'group size',
+  location: 'location',
+  music: 'music',
+  price: 'price',
+  quality: 'quality',
+  scene: 'scene',
+  setting: 'setting',
+  vibe: 'vibe',
+}
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -653,44 +670,79 @@ export function describeVenueMatch(
   event: EventForScoring
 ) {
   const breakdown = buildVenueMatchBreakdown(profile, event)
-  const strengths = [
-    breakdown.energy >= 0.8 ? 'energy' : null,
-    breakdown.vibe >= 0.8 ? 'vibe' : null,
-    breakdown.scene >= 0.8 ? 'scene' : null,
-    breakdown.price >= 0.8 ? 'price' : null,
-    breakdown.crowd >= 0.8 ? 'crowd' : null,
-    breakdown.location >= 0.8 ? 'location' : null,
-    breakdown.conversation >= 0.8 ? 'conversation' : null,
-    breakdown.drinking >= 0.8 ? 'drinks' : null,
-    breakdown.dietary >= 0.8 ? 'dietary fit' : null,
-    breakdown.setting >= 0.8 ? 'setting' : null,
-    breakdown.music >= 0.8 ? 'music' : null,
-    breakdown.cuisine >= 0.8 ? 'cuisine' : null,
-  ].filter(Boolean) as string[]
+  const casual =
+    event.venue_good_for_casual_meetups ||
+    normalizeVenueEnergy(event.venue_energy) === 'Chill' ||
+    normalizeVenueEnergy(event.venue_energy) === 'Moderate'
+  const polished =
+    normalizeVenuePrice(event.venue_price) === '$$$' ||
+    normalizeVenuePrice(event.venue_price) === '$$$$' ||
+    normalizeVibeList(event.venue_vibes).includes('Upscale') ||
+    normalizeCrowdList(event.venue_crowd).includes('Upscale')
+  const sitDown =
+    event.venue_good_for_dinner ||
+    normalizeSettingList(event.venue_setting).includes('Restaurant')
+  const social =
+    normalizeSceneList(event.venue_scene).includes('Social') ||
+    normalizeCrowdList(event.venue_crowd).includes('Mixed') ||
+    breakdown.crowd >= 0.7
+  const cuisine = normalizeCuisineList(event.restaurant_cuisines)[0] ?? null
+  const cuisineMatches =
+    countCuisineOverlap(
+      normalizeCuisineList(profile.cuisine_preferences),
+      normalizeCuisineList(event.restaurant_cuisines)
+    ) > 0
+  const areaMatches = Boolean(
+    profile.subregion &&
+      event.restaurant_subregion &&
+      profile.subregion === event.restaurant_subregion
+  )
 
-  const tensions = [
-    breakdown.energy <= 0.15 ? 'energy' : null,
-    breakdown.vibe <= 0.15 ? 'vibe' : null,
-    breakdown.scene <= 0.15 ? 'scene' : null,
-    breakdown.price <= 0.15 ? 'price' : null,
-    breakdown.crowd <= 0.15 ? 'crowd' : null,
-    breakdown.location <= 0.15 ? 'location' : null,
-    breakdown.conversation <= 0.15 ? 'conversation' : null,
-  ].filter(Boolean) as string[]
-
-  if (strengths.length >= 2) {
-    return `Strongest alignment: ${strengths.slice(0, 3).join(', ')}.`
+  if (!cuisineMatches && breakdown.scene >= 0.7 && breakdown.setting >= 0.65) {
+    return 'Not your usual cuisine, but the relaxed, sit-down setup still fits how you like to go out.'
   }
 
-  if (strengths.length === 1) {
-    return `Best match dimension: ${strengths[0]}.`
+  if (polished && sitDown) {
+    return areaMatches
+      ? 'A more polished dinner pick when you want the night to feel properly put together.'
+      : 'A more polished dinner table that still fits the kind of night you usually save for.'
   }
 
-  if (tensions.length > 0) {
-    return `Weakest alignment: ${tensions.slice(0, 2).join(', ')}.`
+  if (casual && social) {
+    if (cuisine === 'burgers' || cuisine === 'american' || cuisine === 'bbq') {
+      return 'A casual, social table that keeps the night easy without feeling throwaway.'
+    }
+
+    return 'A social, sit-down table that feels easy to say yes to.'
   }
 
-  return 'Built from vibe, food, spend, and table fit.'
+  if (breakdown.location >= 0.85 && areaMatches) {
+    return `Close to your usual ${event.restaurant_subregion} side, with the kind of sit-down pace you tend to save.`
+  }
+
+  if (sitDown && breakdown.conversation >= 0.75) {
+    return 'A sit-down dinner pick that gives the table room to carry the night.'
+  }
+
+  if (breakdown.price >= 0.8 && normalizeVenuePrice(event.venue_price) === '$$') {
+    return 'A moderate-spend table that still feels like a proper night out.'
+  }
+
+  return 'Worth a look when you want a smaller dinner that still fits your usual pace.'
+}
+
+export function getVenueMatchFactors(
+  profile: ProfileForScoring,
+  event: EventForScoring
+) {
+  const breakdown = buildVenueMatchBreakdown(profile, event)
+
+  return (Object.entries(breakdown) as Array<[keyof VenueMatchBreakdown, number]>)
+    .filter(([, score]) => score >= 0.55)
+    .sort((left, right) => right[1] - left[1])
+    .map(([key]) => MATCH_FACTOR_LABELS[key])
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .slice(0, 3)
 }
 
 export function calculateRestaurantMatchScore(

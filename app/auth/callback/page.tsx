@@ -5,11 +5,18 @@ import { useEffect, useState } from 'react'
 
 import { AuthShell } from '@/components/app/AuthShell'
 import { Button } from '@/components/app/Button'
+import { getAppBootstrap } from '@/lib/app/client'
+import { isProfileComplete } from '@/lib/app/format'
 import { supabase } from '@/lib/supabase/client'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState('')
+
+  async function getPostAuthRoute() {
+    const bootstrap = await getAppBootstrap()
+    return isProfileComplete(bootstrap.profile) ? '/dashboard' : '/onboarding'
+  }
 
   useEffect(() => {
     let active = true
@@ -17,7 +24,7 @@ export default function AuthCallbackPage() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (active && session) {
-          router.replace('/dashboard')
+          void getPostAuthRoute().then((route) => router.replace(route))
         }
       }
     )
@@ -47,7 +54,7 @@ export default function AuthCallbackPage() {
         }
 
         if (active) {
-          router.replace('/dashboard')
+          router.replace(await getPostAuthRoute())
         }
         return
       }
@@ -65,7 +72,7 @@ export default function AuthCallbackPage() {
       }
 
       if (session) {
-        router.replace('/dashboard')
+        router.replace(await getPostAuthRoute())
         return
       }
 
@@ -85,18 +92,16 @@ export default function AuthCallbackPage() {
   return (
     <AuthShell
       aside={
-        <div>
-          <p className="tb-label text-sm font-medium uppercase tracking-[0.24em]">
-            Authentication
-          </p>
+        <>
           <h1 className="mt-5 text-5xl font-semibold tracking-tight text-[color:var(--foreground)]">
             Finishing sign-in.
           </h1>
           <p className="tb-copy mt-6 max-w-xl text-lg leading-8">
-            Supabase is exchanging the auth result and restoring the session locally.
+            We&apos;re restoring your account, then sending you back to your saved venues, live tables and profile.
           </p>
-        </div>
+        </>
       }
+      asideTitle="Authentication"
       title="Authentication"
     >
       <p className="tb-label text-sm font-medium uppercase tracking-[0.2em]">
@@ -106,7 +111,7 @@ export default function AuthCallbackPage() {
         Finishing sign-in
       </h1>
       <p className="tb-copy mt-4 text-sm leading-6">
-        Completing the redirect from Supabase and storing the session locally.
+        Completing the redirect and restoring your session.
       </p>
 
       {error ? (

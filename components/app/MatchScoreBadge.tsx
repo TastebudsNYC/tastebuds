@@ -16,9 +16,9 @@ export function MatchScoreBadge({
 
   if (compact) {
     return (
-      <span
-        className={cx(
-          'inline-flex items-center rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-strong)]',
+        <span
+          className={cx(
+          'inline-flex items-center rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-strong)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02] group-hover:shadow-[0_8px_20px_rgba(242,169,0,0.16)]',
           className
         )}
       >
@@ -30,7 +30,7 @@ export function MatchScoreBadge({
   return (
     <div
       className={cx(
-        'rounded-[1.1rem] border border-[color:var(--accent-border)] bg-[linear-gradient(180deg,var(--accent-softer)_0%,var(--accent-soft)_100%)] px-4 py-3 text-[color:var(--accent-strong)] shadow-[0_10px_24px_rgba(245,158,11,0.2)]',
+        'rounded-[1.1rem] border border-[color:var(--accent-border)] bg-[linear-gradient(180deg,var(--accent-softer)_0%,var(--accent-soft)_100%)] px-4 py-3 text-[color:var(--accent-strong)] shadow-[0_10px_24px_rgba(245,158,11,0.2)] transition-[filter,box-shadow,transform] duration-180 group-hover:brightness-[1.02] group-hover:shadow-[0_16px_28px_rgba(242,169,0,0.22)]',
         className
       )}
     >

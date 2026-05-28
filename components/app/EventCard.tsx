@@ -1,10 +1,18 @@
+'use client'
+
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
 import { MatchScoreBadge } from '@/components/app/MatchScoreBadge'
+import { ProfileAvatar } from '@/components/app/ProfileAvatar'
 import { TasteTag } from '@/components/app/TasteTag'
-import { formatDayConfirmationStatus, formatEventDate } from '@/lib/app/format'
+import {
+  formatDayConfirmationStatus,
+  formatEventDate,
+  formatEventLocationLine,
+} from '@/lib/app/format'
 import type { DashboardEvent, FeedbackDraft } from '@/lib/app/types'
 
 const EVENT_IMAGES = [
@@ -14,7 +22,7 @@ const EVENT_IMAGES = [
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCxNfyXjpd5uXbtI5ZwNkfFjXFXvmQ7j2g_YUjKIEmetFmNaMFFqHcBniBnsT17KEBNJa4VNYO9VaQHJCr7SA2WqF0p0AP3uAJqq3AVBdqra9EkmMxwFVsxcACH2dlTC2xTVssN_zHAXQN05iisrUID5xsa8M-o4IyRlhWHPKslpQ1f0LPR0SvjqNavrPIxTf_GNplbRltlI_sEYTtCUrzlxMymtLdIxGCZaC3d1wi4v3RnRJ8Zyq9bbwpNK-0zVNZz8F0zlJ0rlCM3',
 ] as const
 
-function getActionLabel(
+function getPrimaryActionLabel(
   event: DashboardEvent,
   eventActionLoadingId: number | null | undefined
 ) {
@@ -26,15 +34,30 @@ function getActionLabel(
     return 'Event ended'
   }
 
-  if (event.status === 'closed' && !event.isJoined) {
-    return 'Signups closed'
-  }
-
   if (event.isJoined) {
-    return 'Leave table'
+    return 'View booking'
   }
 
-  return event.spotsLeft === 0 ? 'Table full' : 'Join table'
+  if (event.status !== 'open' || event.spotsLeft === 0) {
+    return 'Join waitlist'
+  }
+
+  if (!event.isVenueSaved) {
+    return 'Save & join'
+  }
+
+  return 'Join table'
+}
+
+function isPrimaryActionDisabled(
+  event: DashboardEvent,
+  eventActionLoadingId: number | null | undefined
+) {
+  if (eventActionLoadingId === event.id || event.hasEnded) {
+    return true
+  }
+
+  return false
 }
 
 function getListTags(event: DashboardEvent) {
@@ -59,7 +82,23 @@ function getListTags(event: DashboardEvent) {
   return tags.slice(0, 4)
 }
 
-function getSeatSummary(event: DashboardEvent) {
+function getAvailabilityLabel(event: DashboardEvent) {
+  if (event.hasEnded) {
+    return 'Table ended'
+  }
+
+  if (event.status !== 'open' || event.spotsLeft === 0) {
+    return 'Table full'
+  }
+
+  if (event.attendeeCount === 0) {
+    return `${event.capacity} seats available`
+  }
+
+  return `${event.spotsLeft} of ${event.capacity} seats left`
+}
+
+function getSeatSupportLine(event: DashboardEvent) {
   if (event.hasEnded) {
     if (event.feedback.submitted) {
       return 'You left feedback for this table.'
@@ -73,14 +112,16 @@ function getSeatSummary(event: DashboardEvent) {
   }
 
   if (event.isJoined) {
-    return 'You have a seat at this table.'
+    return `You have a seat at this table. ${event.spotsLeft} of ${event.capacity} seats left.`
   }
 
-  if (event.spotsLeft > 0) {
-    return `${event.spotsLeft} ${event.spotsLeft === 1 ? 'seat' : 'seats'} left from a group of ${event.capacity}.`
+  if (event.status !== 'open' || event.spotsLeft === 0) {
+    return `Table for ${event.capacity}.`
   }
 
-  return `This table is currently full for a group of ${event.capacity}.`
+  return event.attendeeCount > 0
+    ? `${event.attendeeCount} ${event.attendeeCount === 1 ? 'person has' : 'people have'} joined so far.`
+    : 'A venue-hosted table with open seats right now.'
 }
 
 function getDetailSeatTitle(event: DashboardEvent) {
@@ -89,15 +130,19 @@ function getDetailSeatTitle(event: DashboardEvent) {
   }
 
   if (event.signupStatus === 'going') {
-    return 'You are in'
+    return 'You are booked in'
   }
 
-  return event.spotsLeft === 0 ? 'This table is full' : 'You have not joined yet'
+  if (event.status !== 'open' || event.spotsLeft === 0) {
+    return 'This table is full'
+  }
+
+  return 'Seats are open right now'
 }
 
 function getDetailSeatDescription(event: DashboardEvent) {
   if (event.hasEnded || event.signupStatus !== 'going') {
-    return getSeatSummary(event)
+    return `${getAvailabilityLabel(event)}. Table for ${event.capacity}.`
   }
 
   return `Today's reply: ${formatDayConfirmationStatus(event.dayOfConfirmationStatus)}.`
@@ -108,9 +153,43 @@ function getAtAGlanceSeatSummary(event: DashboardEvent) {
     return event.feedback.submitted ? 'Feedback submitted' : 'Ended'
   }
 
-  return event.spotsLeft > 0
-    ? `${event.spotsLeft} ${event.spotsLeft === 1 ? 'seat' : 'seats'} left`
-    : 'Table full'
+  return getAvailabilityLabel(event)
+}
+
+function getStatusTone(event: DashboardEvent) {
+  if (event.isJoined) {
+    return 'joined'
+  }
+
+  if (event.status === 'open' && event.spotsLeft > 0) {
+    return 'open'
+  }
+
+  return 'neutral'
+}
+
+function getStatusChip(event: DashboardEvent) {
+  if (event.isJoined) {
+    return 'Joined'
+  }
+
+  if (event.status === 'open' && event.spotsLeft > 0) {
+    return 'Open table'
+  }
+
+  return 'Table full'
+}
+
+function formatFeedbackRating(value: number | null) {
+  return value === null ? 'Not rated' : `${value}/5`
+}
+
+function formatJoinAgain(value: boolean | null) {
+  if (value === null) {
+    return 'Not answered'
+  }
+
+  return value ? 'Yes' : 'No'
 }
 
 function getShortEventWindow(event: DashboardEvent) {
@@ -152,17 +231,6 @@ function getEventImage(event: DashboardEvent) {
   return EVENT_IMAGES[event.id % EVENT_IMAGES.length] ?? EVENT_IMAGES[0]!
 }
 
-function getAttendeeInitials(displayName: string) {
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('')
-
-  return initials || '?'
-}
-
 function getAttendeePreviewStatus(
   event: DashboardEvent,
   status: DashboardEvent['attendeePreview'][number]['dayOfConfirmationStatus']
@@ -182,6 +250,81 @@ function getAttendeePreviewStatus(
   }
 }
 
+function getAttendeeAreaLabel(
+  attendee: DashboardEvent['attendeePreview'][number]
+) {
+  if (attendee.neighbourhood && attendee.subregion) {
+    return `${attendee.neighbourhood}, ${attendee.subregion}`
+  }
+
+  return attendee.neighbourhood ?? attendee.subregion ?? null
+}
+
+function getAttendeeInterestTags(
+  attendee: DashboardEvent['attendeePreview'][number]
+) {
+  const tags: string[] = []
+
+  for (const cuisine of attendee.cuisinePreferences ?? []) {
+    if (!tags.includes(cuisine)) {
+      tags.push(cuisine)
+    }
+
+    if (tags.length >= 2) {
+      break
+    }
+  }
+
+  const fallbackGroups = [
+    attendee.preferredEnergy,
+    attendee.preferredScene,
+    attendee.preferredCrowd,
+    attendee.conversationPreference,
+  ]
+
+  for (const group of fallbackGroups) {
+    for (const value of group ?? []) {
+      if (!tags.includes(value)) {
+        tags.push(value)
+      }
+
+      if (tags.length >= 4) {
+        return tags
+      }
+    }
+  }
+
+  return tags
+}
+
+function getMatchExplanation(event: DashboardEvent) {
+  if (event.personalMatchSummary?.trim()) {
+    return event.personalMatchSummary.trim()
+  }
+
+  if (event.isJoined) {
+    return 'You already have a seat at this hosted table.'
+  }
+
+  if (event.isVenueSaved && event.status === 'open' && event.spotsLeft > 0) {
+    return 'Already on your watchlist, with a live table available.'
+  }
+
+  if (!event.isVenueSaved && event.status === 'open' && event.spotsLeft > 0) {
+    return 'A live table at a venue that looks promising for your usual dinner style.'
+  }
+
+  return event.venueMatchSummary
+}
+
+function getWhatToExpect(event: DashboardEvent) {
+  if (event.description?.trim()) {
+    return event.description.trim()
+  }
+
+  return 'A small venue-hosted table. Join if you are happy to be matched with people with similar taste and vibe.'
+}
+
 function DetailPanel({
   children,
   title,
@@ -190,7 +333,7 @@ function DetailPanel({
   title: string
 }) {
   return (
-    <section className="rounded-[1.75rem] bg-[#f7f5f0] p-5">
+    <section className="rounded-xl bg-[color:var(--surface-soft)] p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
         {title}
       </p>
@@ -200,48 +343,79 @@ function DetailPanel({
 }
 
 export function EventCard({
-  detailHref,
   event,
   eventActionLoadingId,
   feedbackDraft,
   feedbackSavingId,
+  highlighted = false,
+  onCloseDetails,
+  onHighlightChange,
   onFeedbackDraftChange,
+  onOpenDetails,
+  onSelectSimilarEvent,
   onSetDayOfConfirmation,
   onSetEventSignup,
   onSubmitFeedback,
   similarEvents = [],
   showDetails = false,
+  withinModal = false,
 }: {
-  detailHref?: string
   event: DashboardEvent
   eventActionLoadingId?: number | null
   feedbackDraft?: FeedbackDraft
   feedbackSavingId?: number | null
+  highlighted?: boolean
+  onCloseDetails?: () => void
+  onHighlightChange?: (restaurantId: number | null) => void
   onFeedbackDraftChange?: (draft: FeedbackDraft) => void
+  onOpenDetails?: () => void
+  onSelectSimilarEvent?: (eventId: number) => void
   onSetDayOfConfirmation?: (action: 'confirm' | 'decline') => void
   onSetEventSignup?: (action: 'join' | 'leave') => void
   onSubmitFeedback?: () => void
   similarEvents?: DashboardEvent[]
   showDetails?: boolean
+  withinModal?: boolean
 }) {
   const listTags = getListTags(event)
   const badge = getDateBadge(event.starts_at)
-  const detailBody = event.description?.trim() || 'Small dinners with people you are likely to get on with.'
-  const matchSummary = event.personalMatchSummary ?? event.venueMatchSummary
+  const seatSupportLine = getSeatSupportLine(event)
+  const matchExplanation = getMatchExplanation(event)
+  const locationLine = formatEventLocationLine({
+    distanceKm: event.venueDistanceKm,
+    neighbourhood: event.restaurant_neighbourhood,
+    restaurantName: event.restaurant_name,
+    subregion: event.restaurant_subregion,
+  })
+  const [editingFeedbackEventId, setEditingFeedbackEventId] = useState<number | null>(null)
+  const isEditingFeedback = editingFeedbackEventId === event.id
+  const showFeedbackForm = event.canSubmitFeedback && (!event.feedback.submitted || isEditingFeedback)
 
   return (
-    <article className={`overflow-hidden rounded-[2rem] border bg-white shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)] ${event.hasEnded ? 'border-[color:var(--accent-border)] opacity-90' : 'border-[color:var(--border-soft)]'}`}>
-      <div className={showDetails ? '' : 'grid gap-0 lg:grid-cols-[300px_minmax(0,1fr)]'}>
-        <div className={showDetails ? 'relative h-72 overflow-hidden sm:h-80' : 'relative min-h-64 overflow-hidden'}>
+    <article
+      className={`group overflow-hidden rounded-xl border bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.07)] ${
+        event.hasEnded ? 'border-[color:var(--accent-border)] opacity-90' : 'border-[color:var(--border-soft)]'
+      } ${highlighted ? 'border-[color:var(--accent-border)] shadow-[0_22px_50px_rgba(255,193,67,0.18)]' : ''} ${showDetails ? '' : 'tb-card-interactive'}`}
+      onMouseEnter={() => onHighlightChange?.(event.id)}
+      onMouseLeave={() => onHighlightChange?.(null)}
+    >
+      <div className={showDetails ? '' : 'grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)_220px]'}>
+        <div
+          className={
+            showDetails ? 'relative h-72 overflow-hidden sm:h-80' : 'relative min-h-64 overflow-hidden'
+          }
+        >
           <GooglePlacePhoto
             alt={event.restaurant_name}
             attributionClassName="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white"
             fallbackSrc={getEventImage(event)}
-            imageClassName="h-full w-full object-cover"
+            imageClassName={`h-full w-full object-cover transition-transform duration-300 ease-out ${
+              showDetails ? '' : 'group-hover:scale-[1.02]'
+            }`}
             placeId={event.restaurantGooglePlaceId}
           />
           <div className="absolute left-4 top-4 rounded-lg bg-white/90 px-3 py-2 text-center backdrop-blur">
-            <span className="block text-xl font-bold leading-none text-[#1a1c1b]">{badge.day}</span>
+            <span className="block text-xl font-bold leading-none text-[color:var(--foreground)]">{badge.day}</span>
             <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-strong)]">
               {badge.month}
             </span>
@@ -249,57 +423,58 @@ export function EventCard({
         </div>
 
         <div className="p-6 md:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <div className="flex flex-wrap items-start gap-3">
-                <MatchScoreBadge
-                  className={showDetails ? 'min-w-[190px]' : undefined}
-                  compact={!showDetails}
-                  score={event.projectedRestaurantScore}
-                />
-                {event.signupStatus === 'going' ? (
-                  <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--accent-strong)]">
-                    Joined
-                  </span>
-                ) : null}
-                {event.hasEnded ? (
-                  <span className="rounded-full bg-[#efe9dc] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                    Ended
-                  </span>
-                ) : null}
-                {event.canSubmitFeedback && !event.feedback.submitted ? (
-                  <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--accent-strong)]">
-                    Feedback due
-                  </span>
-                ) : null}
-              </div>
-
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[color:var(--foreground)]">
-                {event.title}
-              </h2>
-              <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">
-                {event.restaurant_name} / {event.restaurant_subregion}
-                {event.restaurant_neighbourhood ? `, ${event.restaurant_neighbourhood}` : ''}
-              </p>
-              <p className="mt-2 text-sm text-[color:var(--text-muted)]">{getShortEventWindow(event)}</p>
-              <p className="mt-2 text-sm text-[color:var(--text-muted)]">{getSeatSummary(event)}</p>
-              {showDetails ? (
-                <p className="mt-5 max-w-3xl text-base leading-7 text-[color:var(--foreground)]">
-                  {detailBody}
-                </p>
-              ) : null}
-            </div>
+          <div className="flex flex-wrap items-start gap-3">
+            <MatchScoreBadge
+              className={showDetails ? 'min-w-[190px]' : undefined}
+              compact={!showDetails}
+              score={event.projectedRestaurantScore}
+            />
+            <span
+              className={
+                getStatusTone(event) === 'joined'
+                  ? 'rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--accent-strong)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02]'
+                  : getStatusTone(event) === 'open'
+                    ? 'rounded-full bg-[color:var(--status-bg)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--status-text)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02]'
+                    : 'rounded-full bg-[color:var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-secondary)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02]'
+              }
+            >
+              {getStatusChip(event)}
+            </span>
+            {event.hasEnded ? (
+              <span className="rounded-full bg-[color:var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-secondary)]">
+                Ended
+              </span>
+            ) : null}
+            {event.canSubmitFeedback && !event.feedback.submitted ? (
+              <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--accent-strong)]">
+                Feedback due
+              </span>
+            ) : null}
           </div>
 
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[color:var(--foreground)]">
+            {event.title}
+          </h2>
+          <p className="mt-2 text-sm font-medium text-[color:var(--foreground)]">
+            {locationLine}
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">{getShortEventWindow(event)}</p>
+
           {!showDetails ? (
-            <div className="mt-5 max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
-                Why it fits you
-              </p>
-              <p className="mt-2 text-base leading-7 text-[color:var(--foreground)]">{matchSummary}</p>
-              <p className="mt-4 text-base leading-7 text-[color:var(--foreground)]">{detailBody}</p>
+            <div className="mt-5 max-w-3xl space-y-3">
+              <p className="text-base leading-7 text-[color:var(--foreground)]">{matchExplanation}</p>
+              {event.venueMatchFactors.length > 0 ? (
+                <p className="text-sm text-[color:var(--text-muted)]">
+                  Match: {event.venueMatchFactors.join(' / ')}
+                </p>
+              ) : null}
+              <p className="text-sm leading-7 text-[color:var(--text-muted)]">{seatSupportLine}</p>
             </div>
-          ) : null}
+          ) : (
+            <p className="mt-5 max-w-3xl text-base leading-7 text-[color:var(--foreground)]">
+              {getWhatToExpect(event)}
+            </p>
+          )}
 
           <div className="mt-5 flex flex-wrap gap-2">
             {listTags.map((value) => (
@@ -307,42 +482,14 @@ export function EventCard({
             ))}
           </div>
 
-          {!showDetails && detailHref ? (
-            <div className="mt-6 flex flex-wrap gap-3">
-              {onSetEventSignup ? (
-                <Button
-                  disabled={
-                    eventActionLoadingId === event.id ||
-                    event.hasEnded ||
-                    (!event.isJoined && (event.status !== 'open' || event.spotsLeft === 0))
-                  }
-                  onClick={() =>
-                    onSetEventSignup(event.isJoined ? 'leave' : 'join')
-                  }
-                  variant={event.isJoined ? 'secondary' : 'primary'}
-                >
-                  {getActionLabel(event, eventActionLoadingId)}
-                </Button>
-              ) : null}
-              <Button href={detailHref} variant="secondary">
-                See details
-              </Button>
-            </div>
-          ) : null}
-
           {showDetails ? (
             <>
               <section className="mt-8 grid gap-4 lg:grid-cols-2">
                 <DetailPanel title="Why this fits you">
-                  <p className="text-sm leading-7 text-[color:var(--foreground)]">
-                    {matchSummary}
-                  </p>
+                  <p className="text-sm leading-7 text-[color:var(--foreground)]">{matchExplanation}</p>
                 </DetailPanel>
                 <DetailPanel title="What to expect">
-                  <p className="text-sm leading-7 text-[color:var(--foreground)]">
-                    {event.description?.trim() ||
-                      `${event.restaurant_name} in ${event.restaurant_subregion}${event.restaurant_neighbourhood ? `, ${event.restaurant_neighbourhood}` : ''} for a group of ${event.capacity}.`}
-                  </p>
+                  <p className="text-sm leading-7 text-[color:var(--foreground)]">{getWhatToExpect(event)}</p>
                 </DetailPanel>
                 <DetailPanel title="Your seat">
                   <p className="text-base font-semibold text-[color:var(--foreground)]">
@@ -357,6 +504,7 @@ export function EventCard({
                     <p>{formatEventDate(event.starts_at)}</p>
                     <p>Table for {event.capacity}</p>
                     <p>{getAtAGlanceSeatSummary(event)}</p>
+                    <p>Hosted by {event.restaurant_name}</p>
                   </div>
                 </DetailPanel>
               </section>
@@ -393,22 +541,47 @@ export function EventCard({
                     event.attendeePreview.length > 0 ? (
                       <div className="space-y-3">
                         {event.attendeePreview.map((attendee, index) => (
-                          <div
-                            className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-soft)] bg-white px-4 py-3"
+                          <article
+                            className="rounded-2xl border border-[color:var(--border-soft)] bg-white px-4 py-4"
                             key={`${event.id}-${attendee.displayName}-${index}`}
                           >
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-sm font-semibold text-[color:var(--accent-strong)]">
-                              {getAttendeeInitials(attendee.displayName)}
+                            <div className="flex items-start gap-3">
+                              <ProfileAvatar
+                                className="h-12 w-12"
+                                displayName={attendee.displayName}
+                                photoUrl={attendee.profilePhotoUrl}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+                                    {attendee.displayName}
+                                  </p>
+                                  <p className="text-xs text-[color:var(--text-muted)]">
+                                    {getAttendeePreviewStatus(event, attendee.dayOfConfirmationStatus)}
+                                  </p>
+                                </div>
+                                {getAttendeeAreaLabel(attendee) ? (
+                                  <p className="mt-1 text-xs text-[color:var(--text-muted)]">
+                                    {getAttendeeAreaLabel(attendee)}
+                                  </p>
+                                ) : null}
+                                {attendee.bio ? (
+                                  <p className="mt-2 text-sm leading-6 text-[color:var(--foreground)]">
+                                    {attendee.bio}
+                                  </p>
+                                ) : null}
+                                {getAttendeeInterestTags(attendee).length > 0 ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {getAttendeeInterestTags(attendee).map((tag) => (
+                                      <TasteTag key={`${event.id}-${attendee.displayName}-${tag}`}>
+                                        {tag}
+                                      </TasteTag>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
-                                {attendee.displayName}
-                              </p>
-                              <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-                                {getAttendeePreviewStatus(event, attendee.dayOfConfirmationStatus)}
-                              </p>
-                            </div>
-                          </div>
+                          </article>
                         ))}
                       </div>
                     ) : (
@@ -420,19 +593,25 @@ export function EventCard({
                 </DetailPanel>
               </div>
 
-              {!event.isJoined && event.spotsLeft === 0 ? (
+              {!event.isJoined && (event.status !== 'open' || event.spotsLeft === 0) ? (
                 <div className="mt-5">
                   <DetailPanel title="Try these instead">
                     {similarEvents.length > 0 ? (
                       <div className="flex flex-wrap gap-3">
                         {similarEvents.map((similarEvent) => (
-                          <Button
-                            href={`/events/${similarEvent.id}`}
-                            key={similarEvent.id}
-                            variant="secondary"
-                          >
-                            {similarEvent.title}
-                          </Button>
+                          onSelectSimilarEvent ? (
+                            <Button
+                              key={similarEvent.id}
+                              onClick={() => onSelectSimilarEvent(similarEvent.id)}
+                              variant="secondary"
+                            >
+                              {similarEvent.title}
+                            </Button>
+                          ) : (
+                            <Button href="/events" key={similarEvent.id} variant="secondary">
+                              {similarEvent.title}
+                            </Button>
+                          )
                         ))}
                       </div>
                     ) : (
@@ -444,7 +623,44 @@ export function EventCard({
                 </div>
               ) : null}
 
-              {event.canSubmitFeedback && feedbackDraft && onFeedbackDraftChange && onSubmitFeedback ? (
+              {event.canSubmitFeedback && event.feedback.submitted && !isEditingFeedback ? (
+                <div className="mt-5">
+                  <DetailPanel title="After the dinner">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <p className="text-sm font-medium text-[color:var(--foreground)]">Venue</p>
+                        <p className="mt-1 text-sm text-[color:var(--text-muted)]">
+                          {formatFeedbackRating(event.feedback.venueRating)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[color:var(--foreground)]">Group</p>
+                        <p className="mt-1 text-sm text-[color:var(--text-muted)]">
+                          {formatFeedbackRating(event.feedback.groupRating)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[color:var(--foreground)]">Join again</p>
+                        <p className="mt-1 text-sm text-[color:var(--text-muted)]">
+                          {formatJoinAgain(event.feedback.wouldJoinAgain)}
+                        </p>
+                      </div>
+                    </div>
+                    {event.feedback.notes ? (
+                      <p className="mt-4 rounded-2xl border border-[color:var(--border-soft)] bg-white p-4 text-sm leading-6 text-[color:var(--foreground)]">
+                        {event.feedback.notes}
+                      </p>
+                    ) : null}
+                    <div className="mt-4">
+                      <Button onClick={() => setEditingFeedbackEventId(event.id)} variant="secondary">
+                        Edit feedback
+                      </Button>
+                    </div>
+                  </DetailPanel>
+                </div>
+              ) : null}
+
+              {showFeedbackForm && feedbackDraft && onFeedbackDraftChange && onSubmitFeedback ? (
                 <div className="mt-5">
                   <DetailPanel title="After the dinner">
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -506,9 +722,7 @@ export function EventCard({
                               })
                             }
                             size="sm"
-                            variant={
-                              feedbackDraft.wouldJoinAgain === option.value ? 'primary' : 'secondary'
-                            }
+                            variant={feedbackDraft.wouldJoinAgain === option.value ? 'primary' : 'secondary'}
                           >
                             {option.label}
                           </Button>
@@ -537,7 +751,10 @@ export function EventCard({
                           !feedbackDraft.venueRating ||
                           !feedbackDraft.wouldJoinAgain
                         }
-                        onClick={onSubmitFeedback}
+                        onClick={() => {
+                          onSubmitFeedback()
+                          setEditingFeedbackEventId(null)
+                        }}
                       >
                         {feedbackSavingId === event.id
                           ? 'Saving...'
@@ -551,28 +768,80 @@ export function EventCard({
               ) : null}
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button href="/events" variant="secondary">
-                  Back to events
-                </Button>
-                {onSetEventSignup ? (
-                  <Button
-                    disabled={
-                      eventActionLoadingId === event.id ||
-                      event.hasEnded ||
-                      (!event.isJoined && (event.status !== 'open' || event.spotsLeft === 0))
-                    }
-                    onClick={() =>
-                      onSetEventSignup(event.isJoined ? 'leave' : 'join')
-                    }
-                    variant={event.isJoined ? 'secondary' : 'primary'}
-                  >
-                    {getActionLabel(event, eventActionLoadingId)}
+                {event.isJoined ? (
+                  <Button disabled variant="secondary">
+                    View booking
                   </Button>
+                ) : onSetEventSignup ? (
+                  <Button
+                    disabled={isPrimaryActionDisabled(event, eventActionLoadingId)}
+                    onClick={() => onSetEventSignup('join')}
+                  >
+                    {getPrimaryActionLabel(event, eventActionLoadingId)}
+                  </Button>
+                ) : null}
+                {withinModal && onCloseDetails ? (
+                  <Button onClick={onCloseDetails} variant="secondary">
+                    Back to events
+                  </Button>
+                ) : (
+                  <Button href="/events" variant="secondary">
+                    Back to events
+                  </Button>
+                )}
+                {(event.status !== 'open' || event.spotsLeft === 0) && !event.isJoined && !event.hasEnded ? (
+                  <p className="w-full text-sm text-[color:var(--text-muted)]">
+                    This table is full. You can still open the join confirmation for details.
+                  </p>
                 ) : null}
               </div>
             </>
           ) : null}
         </div>
+
+        {!showDetails ? (
+          <aside className="border-t border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-6 lg:border-l lg:border-t-0">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                  Availability
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[color:var(--foreground)]">
+                  {getAvailabilityLabel(event)}
+                </p>
+              </div>
+              <div className="grid gap-3 text-sm text-[color:var(--foreground)]">
+                <p>Table for {event.capacity}</p>
+                <p>Hosted by {event.restaurant_name}</p>
+              </div>
+              <div className="space-y-3">
+                {event.isJoined ? (
+                  <Button className="w-full" onClick={onOpenDetails}>
+                    View booking
+                  </Button>
+                ) : onSetEventSignup ? (
+                  <Button
+                    className="w-full"
+                    disabled={isPrimaryActionDisabled(event, eventActionLoadingId)}
+                    onClick={() => onSetEventSignup('join')}
+                  >
+                    {getPrimaryActionLabel(event, eventActionLoadingId)}
+                  </Button>
+                ) : null}
+                {onOpenDetails ? (
+                  <Button className="w-full" onClick={onOpenDetails} variant="secondary">
+                    See details
+                  </Button>
+                ) : null}
+                {(event.status !== 'open' || event.spotsLeft === 0) && !event.isJoined && !event.hasEnded ? (
+                  <p className="text-xs leading-5 text-[color:var(--text-muted)]">
+                    Full right now. Open to review the waitlist message.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </aside>
+        ) : null}
       </div>
     </article>
   )

@@ -38,6 +38,7 @@ type EventAction =
   | 'update'
 type RestaurantAction = 'archive' | 'unarchive' | 'update'
 type AttendeeAction = 'mark-attended' | 'mark-no-show' | 'remove' | 'restore'
+type AdminWorkspace = 'overview' | 'restaurants' | 'events'
 
 type AdminEventAttendee = {
   cuisine_preferences: string[] | null
@@ -553,6 +554,7 @@ export default function AdminPage() {
   const [restaurantSubmitting, setRestaurantSubmitting] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [showArchivedRestaurants, setShowArchivedRestaurants] = useState(false)
+  const [activeWorkspace, setActiveWorkspace] = useState<AdminWorkspace>('overview')
   const [retryingEmails, setRetryingEmails] = useState(false)
   const [runningAutomation, setRunningAutomation] = useState(false)
   const [eventActionLoadingId, setEventActionLoadingId] = useState<number | null>(
@@ -790,6 +792,8 @@ export default function AdminPage() {
   const visibleRestaurants = restaurants.filter((restaurant) =>
     showArchivedRestaurants ? true : restaurant.archived_at === null
   )
+  const atRiskEvents = events.filter((event) => event.viability_status === 'at_risk').slice(0, 3)
+  const upcomingEvents = events.filter((event) => !hasAdminEventEnded(event)).slice(0, 3)
 
   function resetEventForm() {
     setEditingEventId(null)
@@ -1706,8 +1710,69 @@ export default function AdminPage() {
         </div>
       ) : null}
 
-      {summary ? (
-        <section className="mt-8 grid gap-4 md:grid-cols-6">
+      <section className="mt-8 rounded-[1.75rem] border border-zinc-200 bg-white p-3 shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)]">
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              count: summary ? `${summary.totalEvents}` : `${events.length}`,
+              description: 'Scheduling, attendee management, viability, and feedback review.',
+              key: 'overview' as const,
+              label: 'Overview',
+            },
+            {
+              count: `${visibleRestaurants.length}`,
+              description: 'Maintain the tagged venue inventory and import place data.',
+              key: 'restaurants' as const,
+              label: 'Restaurants',
+            },
+            {
+              count: `${events.length}`,
+              description: 'Create nights from inventory, then manage status and attendee outcomes.',
+              key: 'events' as const,
+              label: 'Events',
+            },
+          ].map((workspace) => (
+            <button
+              className={`rounded-[1.25rem] border px-5 py-4 text-left transition ${
+                activeWorkspace === workspace.key
+                  ? 'border-zinc-950 bg-zinc-950 text-white shadow-[0_18px_44px_-24px_rgba(24,24,27,0.65)]'
+                  : 'border-zinc-200 bg-zinc-50 text-zinc-950 hover:border-zinc-400 hover:bg-white'
+              }`}
+              key={workspace.key}
+              onClick={() => setActiveWorkspace(workspace.key)}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p
+                    className={`text-xs font-medium uppercase tracking-[0.18em] ${
+                      activeWorkspace === workspace.key ? 'text-zinc-300' : 'text-zinc-500'
+                    }`}
+                  >
+                    {workspace.label}
+                  </p>
+                  <p className="mt-3 text-sm leading-6">
+                    {workspace.description}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                    activeWorkspace === workspace.key
+                      ? 'bg-white/10 text-white'
+                      : 'bg-white text-zinc-950'
+                  }`}
+                >
+                  {workspace.count}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {activeWorkspace === 'overview' && summary ? (
+        <>
+          <section className="mt-8 grid gap-4 md:grid-cols-6">
           <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-5">
             <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Events</p>
             <p className="mt-2 text-3xl font-semibold text-zinc-950">
@@ -1764,9 +1829,105 @@ export default function AdminPage() {
               {summary.totalDropped} dropped signups
             </p>
           </div>
-        </section>
+          </section>
+
+          <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[1.75rem] border border-zinc-200 bg-zinc-50 p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Operations</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-zinc-950">Run admin jobs without hunting through forms</h2>
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  className="rounded-xl bg-zinc-950 px-5 py-3 font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+                  disabled={retryingEmails}
+                  onClick={() => void retryFailedEmails()}
+                  type="button"
+                >
+                  {retryingEmails ? 'Retrying emails...' : 'Retry failed emails'}
+                </button>
+                <button
+                  className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
+                  disabled={runningAutomation}
+                  onClick={() => void runAutomation()}
+                  type="button"
+                >
+                  {runningAutomation ? 'Running automation...' : 'Run reminders now'}
+                </button>
+                <button
+                  className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white"
+                  onClick={() => setActiveWorkspace('restaurants')}
+                  type="button"
+                >
+                  Open restaurant library
+                </button>
+                <button
+                  className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white"
+                  onClick={() => setActiveWorkspace('events')}
+                  type="button"
+                >
+                  Open event scheduler
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-zinc-200 bg-white p-6">
+              <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">Watchlist</p>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-zinc-950">At-risk events</p>
+                  {atRiskEvents.length > 0 ? (
+                    <div className="mt-2 space-y-2">
+                      {atRiskEvents.map((event) => (
+                        <button
+                          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-400 hover:bg-white"
+                          key={event.id}
+                          onClick={() => setActiveWorkspace('events')}
+                          type="button"
+                        >
+                          <p className="text-sm font-medium text-zinc-950">{event.title}</p>
+                          <p className="mt-1 text-xs text-zinc-600">
+                            {event.restaurant_name} • {event.confirmedTodayCount}/{event.minimum_viable_attendees} confirmed today
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-zinc-600">No events are currently at risk.</p>
+                  )}
+                </div>
+
+                <div className="border-t border-zinc-200 pt-4">
+                  <p className="text-sm font-medium text-zinc-950">Upcoming events</p>
+                  {upcomingEvents.length > 0 ? (
+                    <div className="mt-2 space-y-2">
+                      {upcomingEvents.map((event) => (
+                        <button
+                          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-400 hover:bg-white"
+                          key={event.id}
+                          onClick={() => setActiveWorkspace('events')}
+                          type="button"
+                        >
+                          <p className="text-sm font-medium text-zinc-950">{event.title}</p>
+                          <p className="mt-1 text-xs text-zinc-600">
+                            {formatEventDate(event.starts_at)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-zinc-600">Nothing scheduled yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        </>
       ) : null}
 
+      {activeWorkspace === 'restaurants' ? (
       <section className="mt-8 rounded-[1.75rem] border border-zinc-200 bg-zinc-50 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -2302,22 +2463,6 @@ export default function AdminPage() {
                 Cancel edit
               </button>
             ) : null}
-            <button
-              className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
-              disabled={retryingEmails}
-              onClick={() => void retryFailedEmails()}
-              type="button"
-            >
-              {retryingEmails ? 'Retrying emails...' : 'Retry failed emails'}
-            </button>
-            <button
-              className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
-              disabled={runningAutomation}
-              onClick={() => void runAutomation()}
-              type="button"
-            >
-              {runningAutomation ? 'Running automation...' : 'Run reminders now'}
-            </button>
           </div>
         </form>
 
@@ -2415,7 +2560,10 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+      ) : null}
 
+      {activeWorkspace === 'events' ? (
+      <>
       <section className="mt-8 rounded-[1.75rem] border border-zinc-200 bg-zinc-50 p-6">
         <h2 className="text-xl font-semibold text-zinc-950">
           {editingEventId ? 'Edit event' : 'Schedule event'}
@@ -3017,6 +3165,8 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+      </>
+      ) : null}
     </main>
   )
 }

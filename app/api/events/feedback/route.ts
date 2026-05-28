@@ -138,6 +138,7 @@ export async function POST(request: Request) {
         body: `Your feedback for ${event.title} at ${event.restaurant_name} has been recorded.`,
         duplicateBehavior: 'rearm',
         eventId: event.id,
+        suppressEmail: true,
         title: 'Feedback saved',
         type: 'event_update',
         userId: user.id,

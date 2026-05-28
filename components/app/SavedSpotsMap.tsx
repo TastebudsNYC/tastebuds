@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { Button } from '@/components/app/Button'
+import { formatRestaurantLocationLine } from '@/lib/app/format'
 import type { DashboardRestaurant } from '@/lib/app/types'
 
 type GoogleMapsApi = {
   maps: {
-    InfoWindow: new () => GoogleInfoWindow
     LatLngBounds: new () => GoogleLatLngBounds
     Map: new (
       element: HTMLElement,
@@ -17,13 +18,6 @@ type GoogleMapsApi = {
       CIRCLE: unknown
     }
   }
-}
-
-type GoogleInfoWindow = {
-  addListener: (eventName: string, handler: () => void) => void
-  close: () => void
-  open: (options: Record<string, unknown>) => void
-  setContent: (content: string) => void
 }
 
 type GoogleLatLngBounds = {
@@ -41,6 +35,7 @@ type GoogleMap = {
 
 type GoogleMarker = {
   addListener: (eventName: string, handler: () => void) => void
+  setIcon: (icon: Record<string, unknown>) => void
   setMap: (map: GoogleMap | null) => void
 }
 
@@ -113,65 +108,108 @@ function loadGoogleMaps(apiKey: string) {
   return window.__tastebudsGoogleMapsPromise
 }
 
-function getMarkerIcon(googleApi: GoogleMapsApi, active: boolean) {
+function getMarkerTone(restaurant: DashboardRestaurant) {
+  if (restaurant.availableEventCount > 0) {
+    return {
+      fill: '#FFC143',
+      stroke: '#FFF6E9',
+    }
+  }
+
+  if (restaurant.isSaved) {
+    return {
+      fill: '#6F7D4F',
+      stroke: '#F8F7F3',
+    }
+  }
+
   return {
-    fillColor: active ? '#f59e0b' : '#ffd9e1',
+    fill: '#0B1324',
+    stroke: '#FFF6E9',
+  }
+}
+
+function getMarkerIcon(
+  googleApi: GoogleMapsApi,
+  restaurant: DashboardRestaurant,
+  active: boolean
+) {
+  const tone = getMarkerTone(restaurant)
+
+  return {
+    fillColor: tone.fill,
     fillOpacity: 1,
     path: googleApi.maps.SymbolPath.CIRCLE,
-    scale: active ? 11 : 9,
-    strokeColor: '#ffffff',
+    scale: active ? 11 : 8.8,
+    strokeColor: active ? '#FFF6E9' : tone.stroke,
     strokeOpacity: 1,
-    strokeWeight: 3,
+    strokeWeight: active ? 4 : 3,
+  }
+}
+
+function getUserMarkerIcon(googleApi: GoogleMapsApi) {
+  return {
+    fillColor: '#F8F7F3',
+    fillOpacity: 1,
+    path: googleApi.maps.SymbolPath.CIRCLE,
+    scale: 8,
+    strokeColor: '#F2A900',
+    strokeOpacity: 1,
+    strokeWeight: 4,
   }
 }
 
 function getRestaurantSubtitle(restaurant: DashboardRestaurant) {
-  if (restaurant.restaurant_cuisines?.[0]) {
-    return `${restaurant.restaurant_cuisines[0]} in ${restaurant.subregion}${
-      restaurant.neighbourhood ? `, ${restaurant.neighbourhood}` : ''
-    }`
-  }
-
-  return `${restaurant.subregion}${restaurant.neighbourhood ? `, ${restaurant.neighbourhood}` : ''}`
-}
-
-function getInfoWindowContent(restaurant: DashboardRestaurant) {
-  return `
-    <div style="font-family: Arial, sans-serif; padding: 4px 2px; max-width: 220px;">
-      <div style="font-size: 16px; font-weight: 700; color: #1a1c1b;">${restaurant.name}</div>
-      <div style="font-size: 13px; color: #6c6558; margin-top: 4px;">${getRestaurantSubtitle(restaurant)}</div>
-      ${
-        restaurant.googleRating !== null
-          ? `<div style="font-size: 12px; color: #b45309; margin-top: 8px;">${restaurant.googleRating.toFixed(1)} on Google${
-              restaurant.googleUserRatingsTotal
-                ? ` (${restaurant.googleUserRatingsTotal} reviews)`
-                : ''
-            }</div>`
-          : ''
-      }
-      ${
-        restaurant.googleMapsUri
-          ? `<a href="${restaurant.googleMapsUri}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:#006685;text-decoration:none;">Open in Google Maps</a>`
-          : ''
-      }
-    </div>
-  `
+  return formatRestaurantLocationLine({
+    distanceKm: restaurant.venueDistanceKm,
+    neighbourhood: restaurant.neighbourhood,
+    subregion: restaurant.subregion,
+  })
 }
 
 export function SavedSpotsMap({
+  className,
+  highlightedRestaurantId,
+  id,
+  includeUserLocationInBounds = true,
+  markerClickMode = 'preview',
+  onHighlightRestaurant,
+  onPreviewRestaurant,
   restaurants,
   selectedRestaurantId,
   onSelectRestaurant,
+  previewActionLabel = 'Open details',
+  previewedRestaurantId,
+  showUserMarker = true,
+  showInlinePreviewCard = true,
+  userLocation,
 }: {
+  className?: string
+  highlightedRestaurantId?: number | null
+  id?: string
+  includeUserLocationInBounds?: boolean
+  markerClickMode?: 'preview' | 'select'
+  onHighlightRestaurant?: (restaurantId: number | null) => void
+  onPreviewRestaurant?: (restaurantId: number | null) => void
   onSelectRestaurant?: (restaurantId: number | null) => void
+  previewActionLabel?: string
+  previewedRestaurantId?: number | null
   restaurants: DashboardRestaurant[]
   selectedRestaurantId?: number | null
+  showUserMarker?: boolean
+  showInlinePreviewCard?: boolean
+  userLocation?: { lat: number; lng: number } | null
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
+  const googleApiRef = useRef<GoogleMapsApi | null>(null)
   const mapElementRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<GoogleMap | null>(null)
-  const markersRef = useRef<GoogleMarker[]>([])
-  const infoWindowRef = useRef<GoogleInfoWindow | null>(null)
+  const markersRef = useRef<Map<number, GoogleMarker>>(new Map())
+  const highlightHandlerRef = useRef(onHighlightRestaurant)
+  const previewHandlerRef = useRef(onPreviewRestaurant)
+  const selectHandlerRef = useRef(onSelectRestaurant)
+  const [internalPreviewedRestaurantId, setInternalPreviewedRestaurantId] = useState<number | null>(null)
+  const [mapReadyVersion, setMapReadyVersion] = useState(0)
   const [mapError, setMapError] = useState('')
 
   const mappedRestaurants = useMemo(
@@ -182,9 +220,25 @@ export function SavedSpotsMap({
       ),
     [restaurants]
   )
+  const activePreviewRestaurantId =
+    previewedRestaurantId !== undefined ? previewedRestaurantId : internalPreviewedRestaurantId
+  const activePreviewRestaurant =
+    mappedRestaurants.find((restaurant) => restaurant.id === activePreviewRestaurantId) ?? null
 
   useEffect(() => {
-    if (!apiKey || !mapElementRef.current || mappedRestaurants.length === 0) {
+    highlightHandlerRef.current = onHighlightRestaurant
+  }, [onHighlightRestaurant])
+
+  useEffect(() => {
+    previewHandlerRef.current = onPreviewRestaurant
+  }, [onPreviewRestaurant])
+
+  useEffect(() => {
+    selectHandlerRef.current = onSelectRestaurant
+  }, [onSelectRestaurant])
+
+  useEffect(() => {
+    if (!apiKey || !mapElementRef.current) {
       return
     }
 
@@ -193,6 +247,7 @@ export function SavedSpotsMap({
     async function initialiseMap() {
       try {
         const googleApi = await loadGoogleMaps(apiKey)
+        googleApiRef.current = googleApi
 
         if (cancelled || !mapElementRef.current) {
           return
@@ -206,7 +261,12 @@ export function SavedSpotsMap({
               lat: selectedRestaurant.venue_latitude ?? FALLBACK_CENTER.lat,
               lng: selectedRestaurant.venue_longitude ?? FALLBACK_CENTER.lng,
             }
-          : FALLBACK_CENTER
+          : mappedRestaurants[0]
+            ? {
+                lat: mappedRestaurants[0].venue_latitude ?? FALLBACK_CENTER.lat,
+                lng: mappedRestaurants[0].venue_longitude ?? FALLBACK_CENTER.lng,
+              }
+          : userLocation ?? FALLBACK_CENTER
 
         if (!mapRef.current) {
           mapRef.current = new googleApi.maps.Map(mapElementRef.current, {
@@ -220,69 +280,16 @@ export function SavedSpotsMap({
             styles: MAP_STYLES,
             zoom: 13,
           })
-          infoWindowRef.current = new googleApi.maps.InfoWindow()
           mapRef.current.addListener('click', () => {
-            onSelectRestaurant?.(null)
-            infoWindowRef.current?.close()
-          })
-          infoWindowRef.current.addListener('closeclick', () => {
-            onSelectRestaurant?.(null)
+            setInternalPreviewedRestaurantId(null)
+            previewHandlerRef.current?.(null)
+            if (markerClickMode === 'select') {
+              selectHandlerRef.current?.(null)
+            }
           })
         }
 
-        const map = mapRef.current
-        const infoWindow = infoWindowRef.current
-
-        markersRef.current.forEach((marker) => marker.setMap(null))
-        markersRef.current = []
-
-        const bounds = new googleApi.maps.LatLngBounds()
-
-        for (const restaurant of mappedRestaurants) {
-          const position = {
-            lat: restaurant.venue_latitude ?? FALLBACK_CENTER.lat,
-            lng: restaurant.venue_longitude ?? FALLBACK_CENTER.lng,
-          }
-
-          bounds.extend(position)
-
-          const marker = new googleApi.maps.Marker({
-            icon: getMarkerIcon(googleApi, restaurant.id === selectedRestaurantId),
-            map,
-            position,
-            title: restaurant.name,
-          })
-
-          marker.addListener('click', () => {
-            onSelectRestaurant?.(restaurant.id)
-            infoWindow?.setContent(getInfoWindowContent(restaurant))
-            infoWindow?.open({ anchor: marker, map })
-          })
-
-          if (restaurant.id === selectedRestaurantId && infoWindow) {
-            infoWindow.setContent(getInfoWindowContent(restaurant))
-            infoWindow.open({ anchor: marker, map })
-          }
-
-          markersRef.current.push(marker)
-        }
-
-        if (mappedRestaurants.length === 1) {
-          map.setCenter(bounds.getCenter())
-          map.setZoom(14)
-        } else {
-          map.fitBounds(bounds, 64)
-        }
-
-        if (selectedRestaurant) {
-          map.panTo({
-            lat: selectedRestaurant.venue_latitude ?? FALLBACK_CENTER.lat,
-            lng: selectedRestaurant.venue_longitude ?? FALLBACK_CENTER.lng,
-          })
-        } else if (infoWindow) {
-          infoWindow.close()
-        }
-
+        setMapReadyVersion((current) => current + 1)
         setMapError('')
       } catch (error) {
         if (!cancelled) {
@@ -296,13 +303,144 @@ export function SavedSpotsMap({
     return () => {
       cancelled = true
     }
-  }, [apiKey, mappedRestaurants, onSelectRestaurant, selectedRestaurantId])
+  }, [
+    apiKey,
+    includeUserLocationInBounds,
+    markerClickMode,
+    mappedRestaurants,
+    userLocation,
+  ])
+
+  useEffect(() => {
+    const googleApi = googleApiRef.current
+    const map = mapRef.current
+
+    if (!googleApi || !map) {
+      return
+    }
+
+    markersRef.current.forEach((marker) => marker.setMap(null))
+    markersRef.current = new Map()
+
+    const bounds = new googleApi.maps.LatLngBounds()
+
+    if (showUserMarker && userLocation) {
+      const userMarker = new googleApi.maps.Marker({
+        icon: getUserMarkerIcon(googleApi),
+        map,
+        position: userLocation,
+        title: 'You',
+      })
+
+      markersRef.current.set(-1, userMarker)
+    }
+
+    if (includeUserLocationInBounds && userLocation) {
+      bounds.extend(userLocation)
+    }
+
+    for (const restaurant of mappedRestaurants) {
+      const position = {
+        lat: restaurant.venue_latitude ?? FALLBACK_CENTER.lat,
+        lng: restaurant.venue_longitude ?? FALLBACK_CENTER.lng,
+      }
+
+      bounds.extend(position)
+
+      const marker = new googleApi.maps.Marker({
+        icon: getMarkerIcon(googleApi, restaurant, restaurant.id === selectedRestaurantId),
+        map,
+        position,
+        title: restaurant.name,
+      })
+
+      marker.addListener('mouseover', () => {
+        highlightHandlerRef.current?.(restaurant.id)
+      })
+      marker.addListener('mouseout', () => {
+        highlightHandlerRef.current?.(null)
+      })
+      marker.addListener('click', () => {
+        setInternalPreviewedRestaurantId(restaurant.id)
+        previewHandlerRef.current?.(restaurant.id)
+
+        if (markerClickMode === 'select') {
+          selectHandlerRef.current?.(restaurant.id)
+        }
+      })
+
+      markersRef.current.set(restaurant.id, marker)
+    }
+
+    if (mappedRestaurants.length === 1) {
+      map.setCenter(bounds.getCenter())
+      map.setZoom(14)
+    } else if (mappedRestaurants.length > 1 || userLocation) {
+      map.fitBounds(bounds, 64)
+    }
+  }, [
+    includeUserLocationInBounds,
+    mapReadyVersion,
+    mappedRestaurants,
+    markerClickMode,
+    selectedRestaurantId,
+    showUserMarker,
+    userLocation,
+  ])
+
+  useEffect(() => {
+    const googleApi = googleApiRef.current
+
+    if (!googleApi || markersRef.current.size === 0) {
+      return
+    }
+
+    for (const restaurant of mappedRestaurants) {
+      const marker = markersRef.current.get(restaurant.id)
+
+      if (!marker) {
+        continue
+      }
+
+      marker.setIcon(
+        getMarkerIcon(
+          googleApi,
+          restaurant,
+          restaurant.id === selectedRestaurantId ||
+            restaurant.id === highlightedRestaurantId ||
+            restaurant.id === activePreviewRestaurantId
+        )
+      )
+    }
+  }, [activePreviewRestaurantId, highlightedRestaurantId, mappedRestaurants, selectedRestaurantId])
+
+  useEffect(() => {
+    const map = mapRef.current
+
+    if (!map) {
+      return
+    }
+
+    const activeRestaurant =
+      mappedRestaurants.find((restaurant) => restaurant.id === selectedRestaurantId) ??
+      mappedRestaurants.find((restaurant) => restaurant.id === activePreviewRestaurantId) ??
+      null
+
+    if (!activeRestaurant) {
+      return
+    }
+
+    map.panTo({
+      lat: activeRestaurant.venue_latitude ?? FALLBACK_CENTER.lat,
+      lng: activeRestaurant.venue_longitude ?? FALLBACK_CENTER.lng,
+    })
+  }, [activePreviewRestaurantId, mappedRestaurants, selectedRestaurantId])
 
   if (!apiKey) {
     return (
-      <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-3 rounded-3xl border border-[#d8e6e8] bg-[#dce9e8] p-6 text-center">
-        <p className="text-base font-semibold text-[#1a1c1b]">Interactive map available</p>
-        <p className="max-w-md text-sm leading-6 text-[#6f8f98]">
+      <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-3 rounded-3xl border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-6 text-center">
+        <p className="text-base font-semibold text-[color:var(--foreground)]">Interactive map available</p>
+        <p className="max-w-md text-sm leading-6 text-[color:var(--text-secondary)]">
           Set <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to enable the saved-spots map in the dashboard.
         </p>
       </div>
@@ -311,9 +449,9 @@ export function SavedSpotsMap({
 
   if (mappedRestaurants.length === 0) {
     return (
-      <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-3 rounded-3xl border border-[#d8e6e8] bg-[#dce9e8] p-6 text-center">
-        <p className="text-base font-semibold text-[#1a1c1b]">No mapped restaurants yet</p>
-        <p className="max-w-md text-sm leading-6 text-[#6f8f98]">
+      <div className="flex h-full min-h-[400px] flex-col items-center justify-center gap-3 rounded-3xl border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-6 text-center">
+        <p className="text-base font-semibold text-[color:var(--foreground)]">No mapped restaurants yet</p>
+        <p className="max-w-md text-sm leading-6 text-[color:var(--text-secondary)]">
           Saved restaurants need venue coordinates before they can appear on the map.
         </p>
       </div>
@@ -321,10 +459,65 @@ export function SavedSpotsMap({
   }
 
   return (
-    <div className="relative min-h-[400px] overflow-hidden rounded-3xl border border-[#d8e6e8] bg-[#dce9e8]">
+    <div className={`relative min-h-[400px] overflow-hidden rounded-3xl border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] ${className ?? ''}`} id={id}>
       <div className="absolute inset-0" ref={mapElementRef} />
+      {showInlinePreviewCard && activePreviewRestaurant ? (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[1] sm:inset-x-auto sm:w-[19rem]">
+          <div className="pointer-events-auto rounded-2xl border border-[color:var(--border-soft)] bg-white/96 p-4 shadow-[0_18px_40px_rgba(11,19,36,0.14)] backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-[color:var(--foreground)]">
+                  {activePreviewRestaurant.name}
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                  {getRestaurantSubtitle(activePreviewRestaurant)}
+                </p>
+              </div>
+              <button
+                aria-label="Close map preview"
+                className="rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-2 text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:text-[color:var(--foreground)]"
+                onClick={() => {
+                  setInternalPreviewedRestaurantId(null)
+                  onPreviewRestaurant?.(null)
+                }}
+                type="button"
+              >
+                <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-[color:var(--text-secondary)]">
+              {activePreviewRestaurant.venueMatchSummary}
+            </p>
+            <div className="mt-3 flex items-center justify-between gap-3 text-xs font-semibold">
+              <span className="rounded-full bg-[color:var(--match-bg)] px-3 py-1.5 text-[color:var(--match-text)]">
+                {activePreviewRestaurant.matchScore}% match
+              </span>
+              <span className="text-[color:var(--status-text)]">
+                {activePreviewRestaurant.availableEventCount > 0
+                  ? `${activePreviewRestaurant.availableEventCount} live table${activePreviewRestaurant.availableEventCount === 1 ? '' : 's'}`
+                  : activePreviewRestaurant.isSaved
+                    ? 'Watching'
+                    : 'Recommendation'}
+              </span>
+            </div>
+            {onSelectRestaurant ? (
+              <div className="mt-4">
+                <Button
+                  className="w-full"
+                  onClick={() => onSelectRestaurant(activePreviewRestaurant.id)}
+                  variant="secondary"
+                >
+                  {previewActionLabel}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {mapError ? (
-        <div className="absolute inset-x-4 top-4 rounded-xl bg-white/95 p-3 text-sm text-[#8b0e45] shadow-lg">
+        <div className="absolute inset-x-4 top-4 rounded-xl bg-white/95 p-3 text-sm text-[color:var(--accent-strong)] shadow-lg">
           {mapError}
         </div>
       ) : null}

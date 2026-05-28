@@ -180,7 +180,7 @@ export function LocationSearchField({
         <div className="overflow-hidden rounded-[1.5rem] border border-[color:var(--border-soft)] bg-white shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)]">
           {suggestions.map((suggestion) => (
             <button
-              className="flex w-full items-start justify-between gap-4 border-b border-[color:var(--border-soft)] px-4 py-3 text-left transition last:border-b-0 hover:bg-[#f7f5f0]"
+              className="flex w-full items-start justify-between gap-4 border-b border-[color:var(--border-soft)] px-4 py-3 text-left transition last:border-b-0 hover:bg-[color:var(--surface-soft)]"
               key={`${suggestion.label}:${suggestion.latitude}:${suggestion.longitude}`}
               onClick={() => {
                 committedQueryRef.current = suggestion.label.trim()

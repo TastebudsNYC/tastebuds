@@ -1,9 +1,11 @@
-import Link from 'next/link'
-
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
-import { MatchScoreBadge } from '@/components/app/MatchScoreBadge'
 import { TasteTag } from '@/components/app/TasteTag'
+import {
+  cx,
+  formatMatchScore,
+  formatRestaurantLocationLine,
+} from '@/lib/app/format'
 import type { DashboardRestaurant } from '@/lib/app/types'
 
 const RESTAURANT_IMAGES = [
@@ -12,182 +14,186 @@ const RESTAURANT_IMAGES = [
   'https://lh3.googleusercontent.com/aida-public/AB6AXuANwT_OCTmuJC4naZhU3nuu-_tl7nhx6boXESOu4GLp5ZWE2QupS8HMNQ8yy0ZzGILo9KDGkmYrfwOLwnmf-PZa_KNHdtjFKXI3pdft5g3EDqysljfjWnmqJQWnFOECkd1pt8ssY2BZq9Y5OJu_J9oiPE-ORo3hrHoDFk9xM-r8zFq_WS3azkfo5wzdoYL0xRq9J7_gQ0fi_xMOec9JpOSZFaAFZtm5hw0wQLDQAfNvmSuc06elFW9SCXwRrjWPtLEmFN4LjA5o3yx8',
 ] as const
 
-function getPriorityTags(restaurant: DashboardRestaurant) {
-  const tags: string[] = []
-
-  if (restaurant.restaurant_cuisines?.[0]) {
-    tags.push(restaurant.restaurant_cuisines[0])
-  }
-
-  if (restaurant.venue_price) {
-    tags.push(restaurant.venue_price)
-  }
-
-  if (restaurant.venue_energy) {
-    tags.push(restaurant.venue_energy)
-  }
-
-  if (restaurant.venue_scene?.[0]) {
-    tags.push(restaurant.venue_scene[0])
-  }
-
-  if (restaurant.venue_setting?.[0]) {
-    tags.push(restaurant.venue_setting[0])
-  }
-
-  return tags.slice(0, 5)
-}
-
-function getMatchReason(restaurant: DashboardRestaurant) {
-  if (restaurant.venueMatchSummary) {
-    return restaurant.venueMatchSummary
-  }
-
-  const primaryCuisine = restaurant.restaurant_cuisines?.[0]
-
-  if (primaryCuisine) {
-    return `Picked for ${primaryCuisine.toLowerCase()} food in a setting that fits your night out.`
-  }
-
-  return 'Picked around your taste, budget and social vibe.'
-}
-
 function getRestaurantImage(restaurant: DashboardRestaurant) {
   return RESTAURANT_IMAGES[restaurant.id % RESTAURANT_IMAGES.length] ?? RESTAURANT_IMAGES[0]!
 }
 
+function getSupportLine(restaurant: DashboardRestaurant) {
+  const values = restaurant.topMatchFactors?.filter(Boolean) ?? []
+
+  return values.length > 0
+    ? `Match: ${values.map((value) => value.toLowerCase()).join(' / ')}`
+    : 'Match: taste / budget / vibe'
+}
+
+function getStatusText(restaurant: DashboardRestaurant) {
+  return restaurant.isSaved ? 'Saved and watching' : 'Not saved yet'
+}
+
 export function RestaurantCard({
+  flashState,
+  highlighted = false,
+  onHighlightChange,
   onOpenDetails,
   onToggleSaved,
   restaurant,
   saving,
 }: {
+  flashState?: 'removed' | 'saved' | null
+  highlighted?: boolean
+  onHighlightChange?: (restaurantId: number | null) => void
   onOpenDetails?: (restaurant: DashboardRestaurant) => void
   onToggleSaved?: (restaurantId: number, action: 'save' | 'unsave') => void
   restaurant: DashboardRestaurant
   saving?: boolean
 }) {
-  const priorityTags = getPriorityTags(restaurant)
-  const subtitle = `${restaurant.restaurant_cuisines?.[0] ?? 'Restaurant'} in ${restaurant.subregion}${
-    restaurant.neighbourhood ? `, ${restaurant.neighbourhood}` : ''
-  }`
+  const locationLine = formatRestaurantLocationLine({
+    distanceKm: restaurant.venueDistanceKm,
+    neighbourhood: restaurant.neighbourhood,
+    subregion: restaurant.subregion,
+  })
+  const tags =
+    restaurant.matchTags?.length > 0
+      ? restaurant.matchTags
+      : [restaurant.restaurant_cuisines?.[0], restaurant.subregion, restaurant.venue_price].filter(
+          (value): value is string => Boolean(value)
+        )
+  const statusText = getStatusText(restaurant)
+  const eventText =
+    restaurant.availableEventCount > 0
+      ? restaurant.availableEventCount === 1
+        ? 'Live table available'
+        : 'Live tables available'
+      : 'No live tables yet'
 
   return (
     <article
-      className="cursor-pointer overflow-hidden rounded-[2rem] border border-[color:var(--border-soft)] bg-white shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)] transition hover:shadow-[0_18px_48px_-12px_rgba(113,92,0,0.16)]"
-      onClick={() => onOpenDetails?.(restaurant)}
-      onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && onOpenDetails) {
-          event.preventDefault()
-          onOpenDetails(restaurant)
-        }
-      }}
-      role={onOpenDetails ? 'button' : undefined}
-      tabIndex={onOpenDetails ? 0 : undefined}
+      className={cx(
+        'group overflow-hidden rounded-[1.35rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.07)] tb-card-interactive',
+        highlighted ? 'border-[color:var(--accent-border)] shadow-[0_22px_50px_rgba(255,193,67,0.18)]' : '',
+        flashState === 'saved' ? 'tb-card-flash' : ''
+      )}
+      onMouseEnter={() => onHighlightChange?.(restaurant.id)}
+      onMouseLeave={() => onHighlightChange?.(null)}
     >
-      <div className="grid gap-0 md:grid-cols-[260px_minmax(0,1fr)]">
-        <div className="relative min-h-56 overflow-hidden">
+      <div className="grid gap-0 xl:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="relative min-h-[180px] overflow-hidden xl:min-h-full">
           <GooglePlacePhoto
             alt={restaurant.name}
             attributionClassName="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white"
+            enableCarousel={false}
             fallbackSrc={getRestaurantImage(restaurant)}
-            imageClassName="h-full w-full object-cover"
+            imageClassName="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
             placeId={restaurant.googlePlaceId}
           />
-          <div className="absolute left-4 top-4 max-w-[220px]">
-            <MatchScoreBadge score={restaurant.matchScore} />
-          </div>
         </div>
 
-        <div className="p-6 md:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              {restaurant.isSaved ? (
-                <span className="rounded-full bg-[color:var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--accent-strong)]">
-                  Saved
-                </span>
-              ) : null}
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[color:var(--foreground)]">
-                {restaurant.name}
-              </h2>
-              <p className="mt-2 text-sm text-[color:var(--text-muted)]">{subtitle}</p>
-              {restaurant.googleRating !== null ? (
-                <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-                  {restaurant.googleRating.toFixed(1)}
-                  {restaurant.googleUserRatingsTotal
-                    ? ` on Google from ${restaurant.googleUserRatingsTotal} reviews`
-                    : ' on Google'}
-                </p>
-              ) : null}
+        <div className="p-5 md:p-6">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_230px] xl:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-start gap-4">
+                <div className="inline-flex min-w-[94px] flex-col justify-center rounded-[0.95rem] border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-3 text-[color:var(--accent-strong)] shadow-[0_10px_24px_rgba(74,31,20,0.06)]">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
+                    Match
+                  </span>
+                  <div className="mt-2 flex items-end gap-1">
+                    <span className="text-[1.9rem] font-black leading-none">
+                      {formatMatchScore(restaurant.matchScore)}
+                    </span>
+                    <span className="pb-0.5 text-[11px] font-semibold tracking-[0.02em] text-[color:var(--accent-strong)]">
+                      /100
+                    </span>
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--status-text)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02]">
+                      {restaurant.isSaved ? <span aria-hidden="true">✓</span> : null}
+                      {statusText}
+                    </p>
+                    <p className="text-sm font-medium text-[color:var(--text-secondary)]">
+                      {locationLine}
+                    </p>
+                  </div>
+
+                  <h2 className="mt-3 text-[2rem] font-black tracking-tight text-[color:var(--foreground)]">
+                    {restaurant.name}
+                  </h2>
+
+                  {restaurant.googleRating !== null ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[color:var(--accent-strong)]">
+                      <span className="text-base leading-none">*</span>
+                      <span className="font-semibold">{restaurant.googleRating.toFixed(1)}</span>
+                      <span className="text-[color:var(--text-secondary)]">
+                        {restaurant.googleUserRatingsTotal
+                          ? `(${restaurant.googleUserRatingsTotal} reviews)`
+                          : '(Google rating)'}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <p className="mt-4 max-w-[44rem] text-[1.12rem] font-semibold leading-8 text-[color:var(--foreground)]">
+                    {restaurant.venueMatchSummary || 'Matches enough of your taste profile to be worth saving.'}
+                  </p>
+
+                  <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{getSupportLine(restaurant)}</p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {tags.map((value) => (
+                      <TasteTag key={`${restaurant.id}-${value}`}>{value}</TasteTag>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
-            Why it fits you
-          </p>
-          <p className="mt-2 max-w-3xl text-base leading-7 text-[color:var(--foreground)]">
-            {getMatchReason(restaurant)}
-          </p>
+            <div
+              className="flex flex-col gap-2.5 rounded-[1.1rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-4 xl:ml-auto xl:min-w-[220px]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="inline-flex items-center gap-2 rounded-full bg-[color:var(--status-bg)] px-3 py-2 text-sm font-semibold text-[color:var(--status-text)]">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[color:var(--status-strong)]" />
+                {statusText}
+              </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {priorityTags.map((value) => (
-              <TasteTag key={`${restaurant.id}-${value}`}>{value}</TasteTag>
-            ))}
-          </div>
+              {restaurant.isSaved ? (
+                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">{eventText}</p>
+              ) : restaurant.availableEventCount > 0 ? (
+                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">
+                  Save first, then sign up for any hosted tables here.
+                </p>
+              ) : (
+                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">Save to hear when a table opens.</p>
+              )}
 
-          <div
-            className="mt-6 flex flex-wrap items-center gap-3"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {onToggleSaved ? (
-              <Button
-                disabled={saving}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onToggleSaved(restaurant.id, restaurant.isSaved ? 'unsave' : 'save')
-                }}
-                variant={restaurant.isSaved ? 'secondary' : 'primary'}
-              >
-                {saving ? 'Updating...' : restaurant.isSaved ? 'Unsave' : 'Save restaurant'}
-              </Button>
-            ) : null}
-            {onOpenDetails ? (
-              <Button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onOpenDetails(restaurant)
-                }}
-                variant="secondary"
-              >
-                Details
-              </Button>
-            ) : null}
-            <Button href="/events" variant="secondary">
-              See events
-            </Button>
-            {restaurant.googleMapsUri ? (
-              <Button href={restaurant.googleMapsUri} target="_blank" variant="secondary">
-                View map
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border-soft)] pt-5 text-sm">
-            <p className="text-[color:var(--text-muted)]">
-              {restaurant.availableEventCount > 0
-                ? `${restaurant.availableEventCount} ${restaurant.availableEventCount === 1 ? 'table is' : 'tables are'} live here right now.`
-                : 'No events are live here yet.'}
-            </p>
-            {restaurant.availableEventCount > 0 ? (
-              <span onClick={(event) => event.stopPropagation()}>
-                <Link
-                  className="font-semibold text-[color:var(--link)] hover:underline"
-                  href="/events"
-                >
-                  Browse tables
-                </Link>
-              </span>
-            ) : null}
+              <div className="flex flex-col gap-2 pt-1">
+                {restaurant.isSaved ? (
+                  <Button className="min-h-[48px] group-hover:shadow-[0_14px_24px_rgba(242,169,0,0.22)]" onClick={() => onOpenDetails?.(restaurant)}>
+                    View venue
+                  </Button>
+                ) : (
+                  <>
+                    {onToggleSaved ? (
+                      <Button
+                        className="min-h-[48px] group-hover:shadow-[0_14px_24px_rgba(242,169,0,0.22)]"
+                        disabled={saving}
+                        onClick={() => onToggleSaved(restaurant.id, 'save')}
+                      >
+                        {saving ? 'Saving...' : 'Save venue'}
+                      </Button>
+                    ) : null}
+                    <button
+                      className="text-left text-sm font-semibold text-[color:var(--nav-bg)] transition hover:text-[color:var(--accent-strong)]"
+                      onClick={() => onOpenDetails?.(restaurant)}
+                      type="button"
+                    >
+                      View venue
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

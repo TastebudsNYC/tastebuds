@@ -4,6 +4,86 @@ export function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ')
 }
 
+export function formatCountLabel(
+  count: number,
+  singular: string,
+  plural = `${singular}s`
+) {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+export function formatLiveTableCount(count: number) {
+  return formatCountLabel(count, 'live table')
+}
+
+export function formatWatchingVenueCount(count: number) {
+  return formatCountLabel(count, 'venue watching', 'venues watching')
+}
+
+export function formatUnreadUpdateCount(count: number) {
+  return formatCountLabel(count, 'unread update')
+}
+
+export function formatDistanceMiles(distanceKm: number | null | undefined) {
+  if (typeof distanceKm !== 'number' || Number.isNaN(distanceKm)) {
+    return null
+  }
+
+  const miles = distanceKm * 0.621371
+
+  if (miles < 0.15) {
+    return 'Under 0.1 miles away'
+  }
+
+  return `${miles.toFixed(1)} miles away`
+}
+
+export function formatProfileArea(profile: {
+  neighbourhood: string | null
+  subregion: string | null
+} | null | undefined) {
+  if (profile?.neighbourhood && profile?.subregion) {
+    return profile.neighbourhood === profile.subregion
+      ? profile.subregion
+      : `${profile.neighbourhood}`
+  }
+
+  return profile?.neighbourhood ?? profile?.subregion ?? null
+}
+
+export function formatRestaurantLocationLine(input: {
+  distanceKm?: number | null
+  neighbourhood?: string | null
+  subregion: string
+}) {
+  const areaLabel =
+    input.neighbourhood && input.neighbourhood !== input.subregion
+      ? `${input.subregion}, ${input.neighbourhood}`
+      : input.subregion
+  const distanceLabel = formatDistanceMiles(input.distanceKm)
+
+  return distanceLabel ? `${areaLabel} / ${distanceLabel}` : areaLabel
+}
+
+export function formatEventLocationLine(input: {
+  distanceKm?: number | null
+  restaurantName: string
+  neighbourhood?: string | null
+  subregion: string
+}) {
+  const areaLabel =
+    input.neighbourhood && input.neighbourhood !== input.subregion
+      ? `${input.restaurantName} / ${input.subregion}, ${input.neighbourhood}`
+      : `${input.restaurantName} / ${input.subregion}`
+  const distanceLabel = formatDistanceMiles(input.distanceKm)
+
+  return distanceLabel ? `${areaLabel} / ${distanceLabel}` : areaLabel
+}
+
+export function getTravelRadiusKm(minutes: number) {
+  return Math.max(2, minutes * 0.6)
+}
+
 export function formatEventDate(value: string) {
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'full',

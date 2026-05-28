@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { getRestaurantPlacePhoto } from '@/lib/google-places'
+import { getRestaurantPlacePhoto, getRestaurantPlacePhotos } from '@/lib/google-places'
 
 export async function GET(
   _request: Request,
@@ -14,11 +14,15 @@ export async function GET(
       return NextResponse.json({ error: 'placeId is required.' }, { status: 400 })
     }
 
-    const photo = await getRestaurantPlacePhoto(normalizedPlaceId, 1200)
+    const [photo, photos] = await Promise.all([
+      getRestaurantPlacePhoto(normalizedPlaceId, 1200),
+      getRestaurantPlacePhotos(normalizedPlaceId, 1200, 5),
+    ])
 
     return NextResponse.json({
       ok: true,
       photo,
+      photos,
     })
   } catch (error) {
     return NextResponse.json(

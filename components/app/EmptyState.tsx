@@ -10,10 +10,10 @@ export function EmptyState({
   title: string
 }) {
   return (
-    <div className="rounded-[2rem] border border-dashed border-[color:var(--border-soft)] bg-white p-8 text-center shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)]">
-      <p className="text-2xl font-semibold tracking-tight text-[color:var(--foreground)]">{title}</p>
-      <p className="tb-copy mt-3 text-sm leading-6">{description}</p>
-      {action ? <div className="mt-5">{action}</div> : null}
+    <div className="rounded-xl border border-[color:var(--border-soft)] bg-[color:var(--surface)] px-5 py-5 shadow-[0_12px_28px_rgba(74,31,20,0.045)]">
+      <p className="text-xl font-semibold tracking-tight text-[color:var(--foreground)]">{title}</p>
+      <p className="tb-copy mt-2 max-w-2xl text-sm leading-6">{description}</p>
+      {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )
 }

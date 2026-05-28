@@ -1,130 +1,123 @@
-import * as React from 'react'
+import Image from 'next/image'
 
 import { cx } from '@/lib/app/format'
 
 type LogoSize = 'sm' | 'md' | 'lg'
+type LogoTheme = 'dark' | 'light'
+
+const LOGO_SRC = '/branding/tastebuds-logo.png'
+const LOGO_WIDTH = 1254
+const LOGO_HEIGHT = 405
 
 const sizes = {
   sm: {
-    gap: 'gap-2',
-    mark: 42,
-    text: 'text-2xl',
+    logoWidth: 220,
+    markWidth: 58,
+    tagline: 'text-[0.6rem] tracking-[0.28em]',
   },
   md: {
-    gap: 'gap-3',
-    mark: 46,
-    text: 'text-3xl',
+    logoWidth: 280,
+    markWidth: 72,
+    tagline: 'text-[0.68rem] tracking-[0.3em]',
   },
   lg: {
-    gap: 'gap-4',
-    mark: 68,
-    text: 'text-5xl',
+    logoWidth: 420,
+    markWidth: 104,
+    tagline: 'text-[0.8rem] tracking-[0.32em]',
   },
-} satisfies Record<LogoSize, { gap: string; mark: number; text: string }>
+} satisfies Record<
+  LogoSize,
+  { logoWidth: number; markWidth: number; tagline: string }
+>
 
 type TastebudsMarkProps = {
   className?: string
   size?: LogoSize | number
+  theme?: LogoTheme
 }
 
-function resolveMarkSize(size: LogoSize | number | undefined) {
+function getHeightFromWidth(width: number) {
+  return Math.round((width / LOGO_WIDTH) * LOGO_HEIGHT)
+}
+
+function resolveMarkWidth(size: LogoSize | number | undefined) {
   if (typeof size === 'number') {
     return size
   }
 
-  return sizes[size ?? 'md'].mark
+  return sizes[size ?? 'md'].markWidth
 }
 
 export function TastebudsMark({
   className,
   size = 'md',
 }: TastebudsMarkProps) {
-  const resolvedSize = resolveMarkSize(size)
+  const markWidth = resolveMarkWidth(size)
+  const markHeight = getHeightFromWidth(markWidth)
 
   return (
-    <svg
+    <span
       aria-label="Tastebuds mark"
-      className={className}
-      fill="none"
-      height={resolvedSize}
+      className={cx('inline-flex overflow-hidden', className)}
       role="img"
-      viewBox="0 0 100 100"
-      width={resolvedSize}
-      xmlns="http://www.w3.org/2000/svg"
+      style={{ width: markWidth, height: markHeight }}
     >
-      <path
-        d="
-          M50 7
-          C25.7 7 6 26.7 6 51
-          C6 75.3 25.7 95 50 95
-          C72.1 95 90.4 78.7 93.5 57.4
-          C87.3 58.3 81.6 54.1 80.5 47.9
-          C74.5 49.4 68.5 45.6 67.3 39.4
-          C61.3 40.6 55.5 36.6 54.6 30.5
-          C53.8 24.7 57.2 19.2 62.5 17.1
-          C58.5 10.9 54.5 7 50 7Z
-        "
-        fill="#F59E0B"
+      <Image
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        height={markHeight}
+        priority
+        src={LOGO_SRC}
+        style={{ maxWidth: 'none' }}
+        unoptimized
+        width={markHeight * (LOGO_WIDTH / LOGO_HEIGHT)}
       />
-      <path
-        d="M29 39C34 34.5 40 34.5 44.5 39"
-        stroke="#FAF8F4"
-        strokeLinecap="round"
-        strokeWidth="7"
-      />
-      <circle cx="61.5" cy="41" fill="#FAF8F4" r="5.2" />
-      <path
-        d="M27 61C39 75 61 76 74 61"
-        stroke="#FAF8F4"
-        strokeLinecap="round"
-        strokeWidth="7"
-      />
-      <path
-        d="
-          M58 71
-          C58 82 63 87 69 84
-          C74 81.5 74 73.5 68 69
-        "
-        fill="#FAF8F4"
-      />
-      <path
-        d="M64 74C64.5 78 63.5 81 61.5 83"
-        stroke="#F59E0B"
-        strokeLinecap="round"
-        strokeWidth="3"
-      />
-    </svg>
+    </span>
   )
 }
 
 type TastebudsLogoProps = {
   className?: string
+  showTagline?: boolean
   showWordmark?: boolean
   size?: LogoSize
+  theme?: LogoTheme
 }
 
 export function TastebudsLogo({
   className,
+  showTagline = false,
   showWordmark = true,
   size = 'md',
 }: TastebudsLogoProps) {
   const config = sizes[size]
+  const logoHeight = getHeightFromWidth(config.logoWidth)
 
   return (
-    <div
-      aria-label="Tastebuds"
-      className={cx('inline-flex items-center', config.gap, className)}
-    >
-      <TastebudsMark size={config.mark} />
+    <div aria-label="Tastebuds" className={cx('inline-flex flex-col', className)}>
       {showWordmark ? (
-        <span
+        <Image
+          alt="Tastebuds"
+          draggable={false}
+          height={logoHeight}
+          priority
+          src={LOGO_SRC}
+          unoptimized
+          width={config.logoWidth}
+        />
+      ) : (
+        <TastebudsMark size={size} />
+      )}
+      {showTagline ? (
+        <div
           className={cx(
-            'leading-none font-extrabold tracking-[-0.04em] text-[#0F172A]',
-            config.text
+            'mt-1 whitespace-nowrap font-semibold uppercase text-[color:var(--accent)]',
+            config.tagline
           )}
         >
-          Tastebuds
-        </span>
+          A PLACE TO GATHER. DISCOVER SOMETHING NEW.
+        </div>
       ) : null}
     </div>
   )
