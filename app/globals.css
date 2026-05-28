@@ -555,62 +555,61 @@ a {
 
 .tb-onboarding-backdrop {
   position: absolute;
-  inset: 0 auto auto 0;
-  width: min(56vw, 760px);
-  height: min(48vh, 460px);
-  background: linear-gradient(150deg, #0b1324 0%, #13213b 100%);
-  border-bottom-right-radius: 6.5rem;
-  clip-path: polygon(0 0, 100% 0, 86% 78%, 0 100%);
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255, 193, 67, 0.1), transparent 0 12%),
+    linear-gradient(180deg, rgba(11, 19, 36, 0.04) 0%, rgba(11, 19, 36, 0) 14rem);
   opacity: 1;
   pointer-events: none;
+  transition: background 420ms cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.tb-onboarding-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: min(24vh, 210px);
+  background: linear-gradient(180deg, rgba(11, 19, 36, 0.96) 0%, rgba(11, 19, 36, 0.88) 58%, rgba(11, 19, 36, 0.1) 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 76%, 72% 88%, 0 100%);
   transition:
-    transform 420ms cubic-bezier(0.2, 1, 0.3, 1),
+    height 420ms cubic-bezier(0.2, 1, 0.3, 1),
     clip-path 420ms cubic-bezier(0.2, 1, 0.3, 1),
-    width 420ms cubic-bezier(0.2, 1, 0.3, 1),
-    height 420ms cubic-bezier(0.2, 1, 0.3, 1);
+    transform 420ms cubic-bezier(0.2, 1, 0.3, 1);
 }
 
 .tb-onboarding-backdrop::after {
   content: '';
   position: absolute;
-  right: 8%;
-  top: 46%;
-  width: min(20vw, 240px);
-  height: min(20vw, 240px);
-  background:
-    radial-gradient(circle, var(--tb-onboarding-glow) 0%, rgba(255, 193, 67, 0.06) 42%, transparent 72%);
-  filter: blur(8px);
-  transform: translate(50%, -50%);
+  left: clamp(7rem, 16vw, 16rem);
+  top: clamp(3rem, 10vh, 6rem);
+  width: min(18vw, 200px);
+  height: min(18vw, 200px);
+  background: radial-gradient(circle, var(--tb-onboarding-glow) 0%, rgba(255, 193, 67, 0.05) 44%, transparent 72%);
+  filter: blur(18px);
   pointer-events: none;
   transition:
-    transform 420ms cubic-bezier(0.2, 1, 0.3, 1),
+    left 420ms cubic-bezier(0.2, 1, 0.3, 1),
+    top 420ms cubic-bezier(0.2, 1, 0.3, 1),
     opacity 320ms ease;
-}
-
-.tb-onboarding-theme-welcome .tb-onboarding-backdrop {
-  transform: translate3d(0, 0, 0);
 }
 
 .tb-onboarding-theme-welcome {
   --tb-onboarding-glow: rgba(255, 193, 67, 0.18);
 }
 
-.tb-onboarding-theme-account .tb-onboarding-backdrop {
-  width: min(52vw, 720px);
-  height: min(44vh, 420px);
-  clip-path: polygon(0 0, 100% 0, 82% 80%, 0 100%);
-  transform: translate3d(0, -1.5%, 0);
+.tb-onboarding-theme-account .tb-onboarding-backdrop::before {
+  height: min(22vh, 190px);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 76% 86%, 0 100%);
 }
 
 .tb-onboarding-theme-account {
   --tb-onboarding-glow: rgba(255, 193, 67, 0.13);
 }
 
-.tb-onboarding-theme-activation .tb-onboarding-backdrop {
-  width: min(58vw, 780px);
-  height: min(50vh, 480px);
-  clip-path: polygon(0 0, 100% 0, 88% 76%, 0 100%);
-  transform: translate3d(0, 1%, 0);
+.tb-onboarding-theme-activation .tb-onboarding-backdrop::before {
+  height: min(26vh, 230px);
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 70% 92%, 0 100%);
 }
 
 .tb-onboarding-theme-activation {
@@ -621,11 +620,9 @@ a {
   --tb-onboarding-glow: rgba(255, 193, 67, 0.14);
 }
 
-.tb-onboarding-theme-profile .tb-onboarding-backdrop {
-  width: min(54vw, 740px);
-  height: min(46vh, 450px);
-  clip-path: polygon(0 0, 100% 0, 84% 78%, 0 100%);
-  transform: translate3d(0, 0, 0);
+.tb-onboarding-theme-profile .tb-onboarding-backdrop::before {
+  height: min(23vh, 200px);
+  clip-path: polygon(0 0, 100% 0, 100% 74%, 74% 88%, 0 100%);
 }
 
 .tb-onboarding-header {
@@ -679,7 +676,7 @@ a {
   justify-content: center;
   width: 100%;
   min-height: 100vh;
-  padding: 8.5rem 1.25rem 8rem;
+  padding: 8rem 1.25rem 8rem;
 }
 
 .tb-onboarding-step {
@@ -696,6 +693,7 @@ a {
   align-items: center;
   justify-content: center;
   width: 100%;
+  padding-top: clamp(0.25rem, 3vh, 2rem);
 }
 
 .tb-onboarding-content > * {
@@ -753,34 +751,84 @@ a {
   animation: tb-onboarding-choice-enter 260ms cubic-bezier(0.2, 1, 0.3, 1) both;
 }
 
-.tb-onboarding-step-forward {
-  animation: tb-onboarding-step-forward 420ms cubic-bezier(0.2, 1, 0.3, 1);
+.tb-onboarding-step-out-forward {
+  animation: tb-onboarding-step-out-forward 180ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-.tb-onboarding-step-back {
-  animation: tb-onboarding-step-back 420ms cubic-bezier(0.2, 1, 0.3, 1);
+.tb-onboarding-step-in-forward {
+  animation: tb-onboarding-step-in-forward 340ms cubic-bezier(0.2, 1, 0.3, 1) both;
 }
 
-@keyframes tb-onboarding-step-forward {
-  from {
-    opacity: 0;
-    transform: translate3d(42px, -10px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+.tb-onboarding-step-out-back {
+  animation: tb-onboarding-step-out-back 180ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-@keyframes tb-onboarding-step-back {
-  from {
-    opacity: 0;
-    transform: translate3d(-42px, 10px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+.tb-onboarding-step-in-back {
+  animation: tb-onboarding-step-in-back 340ms cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.tb-onboarding-transition-plane {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  background: linear-gradient(135deg, #0b1324 0%, #13213b 72%, rgba(255, 193, 67, 0.92) 100%);
+}
+
+.tb-onboarding-transition-out-forward {
+  animation: tb-onboarding-transition-out-forward 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.tb-onboarding-transition-in-forward {
+  animation: tb-onboarding-transition-in-forward 260ms cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.tb-onboarding-transition-out-back {
+  animation: tb-onboarding-transition-out-back 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.tb-onboarding-transition-in-back {
+  animation: tb-onboarding-transition-in-back 260ms cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+@keyframes tb-onboarding-step-out-forward {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(-80px, 8px, 0); }
+}
+
+@keyframes tb-onboarding-step-in-forward {
+  from { opacity: 0; transform: translate3d(84px, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes tb-onboarding-step-out-back {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(80px, -8px, 0); }
+}
+
+@keyframes tb-onboarding-step-in-back {
+  from { opacity: 0; transform: translate3d(-84px, -8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes tb-onboarding-transition-out-forward {
+  from { transform: scaleX(0); transform-origin: left; opacity: 1; }
+  to { transform: scaleX(1); transform-origin: left; opacity: 1; }
+}
+
+@keyframes tb-onboarding-transition-in-forward {
+  from { transform: scaleX(1); transform-origin: right; opacity: 1; }
+  to { transform: scaleX(0); transform-origin: right; opacity: 1; }
+}
+
+@keyframes tb-onboarding-transition-out-back {
+  from { transform: scaleX(0); transform-origin: right; opacity: 1; }
+  to { transform: scaleX(1); transform-origin: right; opacity: 1; }
+}
+
+@keyframes tb-onboarding-transition-in-back {
+  from { transform: scaleX(1); transform-origin: left; opacity: 1; }
+  to { transform: scaleX(0); transform-origin: left; opacity: 1; }
 }
 
 @keyframes tb-onboarding-choice-enter {
@@ -800,7 +848,7 @@ a {
   }
 
   .tb-onboarding-main {
-    padding: 8.75rem 3rem 8.5rem;
+    padding: 8rem 3rem 8.5rem;
   }
 
   .tb-onboarding-content {
@@ -830,11 +878,9 @@ a {
 }
 
 @media (max-width: 767px) {
-  .tb-onboarding-backdrop {
-    width: 100%;
-    height: 32vh;
-    border-bottom-right-radius: 4.5rem;
-    clip-path: polygon(0 0, 100% 0, 100% 72%, 0 100%);
+  .tb-onboarding-backdrop::before {
+    height: min(22vh, 180px);
+    clip-path: polygon(0 0, 100% 0, 100% 80%, 55% 92%, 0 100%);
   }
 
   .tb-onboarding-progress-meta {

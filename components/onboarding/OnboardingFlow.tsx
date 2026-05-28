@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
@@ -138,6 +138,7 @@ function StageShell({
   progressTotal,
   showLoginLink = true,
   stageId,
+  transitionPhase,
 }: {
   children: React.ReactNode
   currentStep: number
@@ -146,13 +147,37 @@ function StageShell({
   progressTotal: number
   showLoginLink?: boolean
   stageId: StageId | 'loading'
+  transitionPhase: 'idle' | 'out' | 'in'
 }) {
   const progress = progressTotal <= 1 ? 1 : currentStep / progressTotal
   const stageAccent = getStageAccentClass(stageId)
+  const stepMotionClass =
+    transitionPhase === 'out'
+      ? direction < 0
+        ? 'tb-onboarding-step-out-back'
+        : 'tb-onboarding-step-out-forward'
+      : transitionPhase === 'in'
+        ? direction < 0
+          ? 'tb-onboarding-step-in-back'
+          : 'tb-onboarding-step-in-forward'
+        : ''
+  const wipeClass =
+    transitionPhase === 'out'
+      ? direction < 0
+        ? 'tb-onboarding-transition-out-back'
+        : 'tb-onboarding-transition-out-forward'
+      : transitionPhase === 'in'
+        ? direction < 0
+          ? 'tb-onboarding-transition-in-back'
+          : 'tb-onboarding-transition-in-forward'
+        : ''
 
   return (
     <main className={`tb-onboarding-shell ${stageAccent}`}>
       <div className="tb-onboarding-backdrop" />
+      {transitionPhase !== 'idle' ? (
+        <div className={`tb-onboarding-transition-plane ${wipeClass}`} />
+      ) : null}
       <div className="relative min-h-screen">
         <header className="tb-onboarding-header">
           <div className="tb-onboarding-logo-lockup">
@@ -161,7 +186,7 @@ function StageShell({
           <div className="tb-onboarding-progress-meta">
             {showLoginLink ? (
               <Link
-                className="text-sm font-semibold text-white/68 transition hover:text-white"
+                className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--nav-bg)_72%,white)] transition hover:text-[color:var(--nav-bg)]"
                 href="/login"
               >
                 Log in
@@ -185,12 +210,7 @@ function StageShell({
         </div>
 
         <section className="tb-onboarding-main">
-          <div
-            className={`tb-onboarding-step ${
-              direction < 0 ? 'tb-onboarding-step-back' : 'tb-onboarding-step-forward'
-            }`}
-            key={stageId}
-          >
+          <div className={`tb-onboarding-step ${stepMotionClass}`} key={stageId}>
             <div className="tb-onboarding-content">
               {children}
             </div>
@@ -438,6 +458,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const router = useRouter()
   const [draft, setDraft] = useState<ProfileDraft>(createEmptyProfileDraft())
   const [stage, setStage] = useState<StageId>(mode === 'signup' ? 'welcome-1' : 'display-name')
+  const [renderStage, setRenderStage] = useState<StageId>(mode === 'signup' ? 'welcome-1' : 'display-name')
   const [sessionChecked, setSessionChecked] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -448,12 +469,54 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [direction, setDirection] = useState<1 | -1>(1)
+  const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle')
   const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>([])
   const [restaurantsLoading, setRestaurantsLoading] = useState(false)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
   const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
+  const transitionOutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const transitionInTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function resetSignupState() {
+  const clearTransitionTimers = useCallback(() => {
+    if (transitionOutTimeoutRef.current) {
+      clearTimeout(transitionOutTimeoutRef.current)
+      transitionOutTimeoutRef.current = null
+    }
+
+    if (transitionInTimeoutRef.current) {
+      clearTimeout(transitionInTimeoutRef.current)
+      transitionInTimeoutRef.current = null
+    }
+  }, [])
+
+  const syncStage = useCallback((nextStage: StageId) => {
+    clearTransitionTimers()
+    setStage(nextStage)
+    setRenderStage(nextStage)
+    setTransitionPhase('idle')
+  }, [clearTransitionTimers])
+
+  function transitionToStage(nextStage: StageId, nextDirection: 1 | -1) {
+    if (nextStage === renderStage || transitionPhase !== 'idle') {
+      return
+    }
+
+    clearTransitionTimers()
+    setDirection(nextDirection)
+    setTransitionPhase('out')
+
+    transitionOutTimeoutRef.current = setTimeout(() => {
+      setStage(nextStage)
+      setRenderStage(nextStage)
+      setTransitionPhase('in')
+
+      transitionInTimeoutRef.current = setTimeout(() => {
+        setTransitionPhase('idle')
+      }, 320)
+    }, 180)
+  }
+
+  const resetSignupState = useCallback(() => {
     clearAppBootstrapCache()
     clearPendingSignup()
     clearSignupConfirmationSignal()
@@ -465,9 +528,9 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     setConfirmPassword('')
     setRestaurants([])
     setSelectedRestaurant(null)
-    setStage('welcome-1')
+    syncStage('welcome-1')
     setAuthenticated(false)
-  }
+  }, [syncStage])
 
   useEffect(() => {
     let active = true
@@ -533,7 +596,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
           const nextRestaurants = payload.restaurants ?? []
           setRestaurants(nextRestaurants)
-          setStage(
+          syncStage(
             nextRestaurants.filter((restaurant) => restaurant.isSaved).length >= 2
               ? 'finish'
               : 'restaurants'
@@ -546,7 +609,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         }
       }
 
-      setStage(getProfileStartStage(nextDraft))
+      syncStage(getProfileStartStage(nextDraft))
     }
 
     void bootstrapFlow().catch(async () => {
@@ -564,38 +627,42 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
     return () => {
       active = false
+      clearTransitionTimers()
     }
-  }, [mode, router])
+  }, [clearTransitionTimers, mode, resetSignupState, router, syncStage])
 
   const visibleStages = authenticated ? PROFILE_STAGE_SEQUENCE : SIGNUP_STAGE_SEQUENCE
-  const currentStageIndex = Math.max(visibleStages.indexOf(stage), 0)
+  const currentStageIndex = Math.max(visibleStages.indexOf(renderStage), 0)
   const currentStep = currentStageIndex + 1
   const canGoBack = currentStageIndex > 0
+  const isTransitioning = transitionPhase !== 'idle'
 
   function goBack() {
-    if (!canGoBack) {
+    if (!canGoBack || isTransitioning) {
       return
     }
 
-    setDirection(-1)
     setError('')
     setMessage('')
-    setStage(visibleStages[currentStageIndex - 1] ?? visibleStages[0]!)
+    transitionToStage(visibleStages[currentStageIndex - 1] ?? visibleStages[0]!, -1)
   }
 
   function continueTo(nextStage?: StageId) {
-    setDirection(1)
+    if (isTransitioning) {
+      return
+    }
+
     setError('')
     setMessage('')
 
     if (nextStage) {
-      setStage(nextStage)
+      transitionToStage(nextStage, 1)
       return
     }
 
     const candidate = visibleStages[currentStageIndex + 1]
     if (candidate) {
-      setStage(candidate)
+      transitionToStage(candidate, 1)
     }
   }
 
@@ -645,8 +712,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     clearPendingSignup()
     setAuthenticated(true)
     setUserId(data.session.user.id)
-    setDirection(1)
-    setStage('display-name')
+    syncStage('display-name')
   }
 
   async function handleFinishSetup() {
@@ -667,8 +733,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       const payload = await fetchRestaurants()
       const nextRestaurants = payload.restaurants ?? []
       setRestaurants(nextRestaurants)
-      setDirection(1)
-      setStage('restaurants')
+      syncStage('restaurants')
     } catch (nextError) {
       const message =
         nextError instanceof Error ? nextError.message : 'Could not save your profile.'
@@ -730,8 +795,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   function handleActivationContinue() {
     clearOnboardingActivationPending()
 
-    setDirection(1)
-    setStage('finish')
+    transitionToStage('finish', 1)
   }
 
   if (!sessionChecked) {
@@ -743,6 +807,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         progressTotal={visibleStages.length}
         showLoginLink={!authenticated}
         stageId="loading"
+        transitionPhase="idle"
       >
         <StageHeading
           heading="Preparing your setup"
@@ -764,11 +829,11 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const inputClassName =
     'tb-input min-h-[4.65rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/94 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.05)]'
   const backButtonClass =
-    'h-14 min-w-[7.75rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
+    'h-[3.75rem] min-w-[8.5rem] px-9 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
   const primaryButtonClass =
-    'h-14 min-w-[10rem] px-10 text-base shadow-[0_18px_34px_rgba(245,158,11,0.24)]'
+    'h-[3.75rem] min-w-[10.5rem] px-10 text-base shadow-[0_18px_34px_rgba(245,158,11,0.24)]'
   const secondaryActionButtonClass =
-    'h-14 min-w-[10rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
+    'h-[3.75rem] min-w-[10rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
   const canContinueFromFooter =
     stage === 'drinks'
       ? true
@@ -780,19 +845,19 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
     <div className="tb-onboarding-actions">
       <div className="tb-onboarding-actions-left">
         {canGoBack ? (
-          <Button className={backButtonClass} onClick={goBack} variant="secondary">
+          <Button className={backButtonClass} disabled={isTransitioning} onClick={goBack} variant="secondary">
             Back
           </Button>
         ) : (
           <span />
         )}
         {stage === 'bio' ? (
-          <Button className="h-14 px-8 text-base" onClick={() => continueTo()} variant="ghost">
+          <Button className="h-[3.75rem] px-8 text-base" disabled={isTransitioning} onClick={() => continueTo()} variant="ghost">
             Skip for now
           </Button>
         ) : null}
         {stage === 'restaurants' ? (
-          <Button className="h-14 px-8 text-base" onClick={handleActivationContinue} variant="ghost">
+          <Button className="h-[3.75rem] px-8 text-base" disabled={isTransitioning} onClick={handleActivationContinue} variant="ghost">
             Skip for now
           </Button>
         ) : null}
@@ -818,17 +883,17 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             </Button>
           </div>
         ) : stage === 'account-password' ? (
-          <Button className={primaryButtonClass} disabled={loading} onClick={() => void handleCreateAccount()}>
+          <Button className={primaryButtonClass} disabled={loading || isTransitioning} onClick={() => void handleCreateAccount()}>
             {loading ? 'Creating account...' : 'Create account'}
           </Button>
         ) : stage === 'group-age' ? (
-          <Button className={primaryButtonClass} disabled={loading || disableContinue} onClick={() => void handleFinishSetup()}>
+          <Button className={primaryButtonClass} disabled={loading || disableContinue || isTransitioning} onClick={() => void handleFinishSetup()}>
             {loading ? 'Saving profile...' : 'Continue'}
           </Button>
         ) : stage === 'restaurants' ? (
           <Button
             className={primaryButtonClass}
-            disabled={restaurantSelectionRequired && savedRestaurantCount < 2}
+            disabled={isTransitioning || (restaurantSelectionRequired && savedRestaurantCount < 2)}
             onClick={handleActivationContinue}
           >
             Continue
@@ -836,7 +901,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         ) : (
           <Button
             className={primaryButtonClass}
-            disabled={!canContinueFromFooter}
+            disabled={!canContinueFromFooter || isTransitioning}
             onClick={() => continueTo()}
           >
             {stage === 'welcome-1' || stage === 'welcome-2'
@@ -857,9 +922,10 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       footer={footer}
       progressTotal={visibleStages.length}
       showLoginLink={!authenticated}
-      stageId={stage}
+      stageId={renderStage}
+      transitionPhase={transitionPhase}
     >
-      {stage === 'welcome-1' ? (
+      {renderStage === 'welcome-1' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Welcome"
@@ -869,7 +935,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'welcome-2' ? (
+      {renderStage === 'welcome-2' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="How it works"
@@ -879,7 +945,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'welcome-3' ? (
+      {renderStage === 'welcome-3' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Matching"
@@ -889,7 +955,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'account-email' ? (
+      {renderStage === 'account-email' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Create account"
@@ -910,7 +976,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'account-password' ? (
+      {renderStage === 'account-password' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Create account"
@@ -948,7 +1014,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'display-name' ? (
+      {renderStage === 'display-name' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Basics"
@@ -970,7 +1036,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'bio' ? (
+      {renderStage === 'bio' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Basics"
@@ -991,7 +1057,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'home-area' ? (
+      {renderStage === 'home-area' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Location"
@@ -1025,7 +1091,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'preferred-area' ? (
+      {renderStage === 'preferred-area' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Location"
@@ -1046,7 +1112,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'travel' ? (
+      {renderStage === 'travel' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Location"
@@ -1069,7 +1135,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'price' ? (
+      {renderStage === 'price' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Food"
@@ -1090,7 +1156,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'cuisines' ? (
+      {renderStage === 'cuisines' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Food"
@@ -1113,7 +1179,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'dietary' ? (
+      {renderStage === 'dietary' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Food"
@@ -1137,7 +1203,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'drinks' ? (
+      {renderStage === 'drinks' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Food"
@@ -1158,7 +1224,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'energy-scene' ? (
+      {renderStage === 'energy-scene' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Dinner vibe"
@@ -1192,7 +1258,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'music-setting' ? (
+      {renderStage === 'music-setting' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Dinner vibe"
@@ -1226,7 +1292,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'vibes' ? (
+      {renderStage === 'vibes' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Dinner vibe"
@@ -1247,7 +1313,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'crowd-conversation' ? (
+      {renderStage === 'crowd-conversation' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Social"
@@ -1284,7 +1350,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'group-age' ? (
+      {renderStage === 'group-age' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Social"
@@ -1318,7 +1384,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'restaurants' ? (
+      {renderStage === 'restaurants' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Activation"
@@ -1451,7 +1517,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         </div>
       ) : null}
 
-      {stage === 'finish' ? (
+      {renderStage === 'finish' ? (
         <div className="space-y-8">
           <StageHeading
             eyebrow="Ready"
