@@ -155,8 +155,10 @@ function StageShell({
       <div className="tb-onboarding-backdrop" />
       <div className="relative min-h-screen">
         <header className="tb-onboarding-header">
-          <TastebudsLogo showTagline={false} size="sm" theme="dark" />
-          <div className="flex min-w-[180px] flex-col items-end gap-2">
+          <div className="tb-onboarding-logo-lockup">
+            <TastebudsLogo showTagline={false} size="sm" theme="dark" />
+          </div>
+          <div className="tb-onboarding-progress-meta">
             {showLoginLink ? (
               <Link
                 className="text-sm font-semibold text-white/68 transition hover:text-white"
@@ -169,7 +171,6 @@ function StageShell({
             )}
             <div className="w-full">
               <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f8dfba]">
-                <span>Setup</span>
                 <span>
                   {currentStep}
                   {' '} / {' '}
@@ -774,8 +775,8 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         : !disableContinue
 
   const footer = (
-    <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center gap-3">
+    <div className="tb-onboarding-actions">
+      <div className="tb-onboarding-actions-left">
         {canGoBack ? (
           <Button className="min-w-32" onClick={goBack} variant="secondary">
             Back
@@ -795,7 +796,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
         ) : null}
       </div>
 
-      <div className="flex flex-col items-stretch gap-3 lg:items-end">
+      <div className="tb-onboarding-actions-right">
         {stage === 'account-email' ? (
           <Link
             className="text-sm font-semibold text-[color:var(--text-secondary)] underline underline-offset-2"

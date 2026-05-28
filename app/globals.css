@@ -552,9 +552,10 @@ a {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 84% 14%, var(--tb-onboarding-glow), transparent 0 18%),
-    radial-gradient(circle at 16% 78%, var(--tb-onboarding-shadow), transparent 0 24%),
-    linear-gradient(154deg, var(--tb-onboarding-navy) 0%, var(--tb-onboarding-navy-soft) 28%, var(--tb-onboarding-surface) 52%, var(--tb-onboarding-surface) 100%);
+    radial-gradient(circle at 88% 16%, var(--tb-onboarding-glow), transparent 0 18%),
+    radial-gradient(circle at 12% 14%, rgba(12, 21, 38, 0.2), transparent 0 16%),
+    radial-gradient(circle at 18% 82%, var(--tb-onboarding-shadow), transparent 0 20%),
+    linear-gradient(180deg, rgba(11, 19, 36, 0.94) 0%, rgba(18, 29, 49, 0.82) 14%, rgba(247, 243, 234, 0.96) 34%, var(--tb-onboarding-surface) 58%, var(--tb-onboarding-surface) 100%);
   transition:
     background 420ms cubic-bezier(0.2, 1, 0.3, 1),
     color 320ms ease;
@@ -626,6 +627,24 @@ a {
   background: none;
 }
 
+.tb-onboarding-logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.5rem 0.7rem;
+  background: linear-gradient(180deg, rgba(11, 19, 36, 0.86), rgba(11, 19, 36, 0.62));
+  box-shadow: 0 14px 34px rgba(7, 12, 24, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.tb-onboarding-progress-meta {
+  display: flex;
+  min-width: 104px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
 .tb-onboarding-progress-track {
   width: 100%;
   height: 2px;
@@ -647,7 +666,7 @@ a {
   justify-content: center;
   width: 100%;
   min-height: 100vh;
-  padding: 8rem 1.25rem 8.5rem;
+  padding: 8.75rem 1.25rem 8.75rem;
 }
 
 .tb-onboarding-step {
@@ -668,7 +687,7 @@ a {
 
 .tb-onboarding-content > * {
   width: 100%;
-  max-width: 60rem;
+  max-width: 58rem;
 }
 
 .tb-onboarding-footer {
@@ -688,6 +707,29 @@ a {
 
 .tb-onboarding-footer-inner > * {
   pointer-events: auto;
+}
+
+.tb-onboarding-actions {
+  position: relative;
+  display: flex;
+  min-height: 7rem;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.tb-onboarding-actions-left,
+.tb-onboarding-actions-right {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.tb-onboarding-actions-left {
+  justify-content: flex-start;
+}
+
+.tb-onboarding-actions-right {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .tb-onboarding-choice {
@@ -741,7 +783,7 @@ a {
   }
 
   .tb-onboarding-main {
-    padding: 8.5rem 3rem 9rem;
+    padding: 8.5rem 3rem 8.5rem;
   }
 
   .tb-onboarding-content {
@@ -750,5 +792,22 @@ a {
 
   .tb-onboarding-footer-inner {
     padding: 0 2rem 1.6rem;
+  }
+
+  .tb-onboarding-actions {
+    min-height: 4rem;
+  }
+
+  .tb-onboarding-actions-left {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+  }
+
+  .tb-onboarding-actions-right {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    align-items: flex-end;
   }
 }
