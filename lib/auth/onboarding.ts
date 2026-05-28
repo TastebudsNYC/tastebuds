@@ -3,9 +3,16 @@ import { isProfileComplete } from '@/lib/app/format'
 
 const PENDING_SIGNUP_KEY = 'tastebuds:pending-signup'
 const ONBOARDING_ACTIVATION_KEY = 'tastebuds:onboarding-activation-pending'
+const SIGNUP_CONFIRMATION_SIGNAL_KEY = 'tastebuds:signup-confirmation-signal'
 
 type PendingSignupState = {
   email: string
+}
+
+type SignupConfirmationSignal = {
+  confirmedAt: number
+  email: string | null
+  route: string
 }
 
 function canUseStorage() {
@@ -59,6 +66,40 @@ export function clearPendingSignup() {
   }
 
   window.localStorage.removeItem(PENDING_SIGNUP_KEY)
+}
+
+export function setSignupConfirmationSignal(signal: SignupConfirmationSignal) {
+  if (!canUseStorage()) {
+    return
+  }
+
+  window.localStorage.setItem(SIGNUP_CONFIRMATION_SIGNAL_KEY, JSON.stringify(signal))
+}
+
+export function getSignupConfirmationSignal() {
+  if (!canUseStorage()) {
+    return null
+  }
+
+  const rawValue = window.localStorage.getItem(SIGNUP_CONFIRMATION_SIGNAL_KEY)
+
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawValue) as SignupConfirmationSignal
+  } catch {
+    return null
+  }
+}
+
+export function clearSignupConfirmationSignal() {
+  if (!canUseStorage()) {
+    return
+  }
+
+  window.localStorage.removeItem(SIGNUP_CONFIRMATION_SIGNAL_KEY)
 }
 
 export function setOnboardingActivationPending() {

@@ -3,12 +3,15 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-import { AuthShell } from '@/components/app/AuthShell'
 import { Button } from '@/components/app/Button'
+import { TastebudsLogo } from '@/components/TastebudsLogo'
 import {
   buildAuthCallbackUrl,
   clearPendingSignup,
+  clearSignupConfirmationSignal,
+  getPendingSignup,
   getPostAuthRoute,
+  getSignupConfirmationSignal,
 } from '@/lib/auth/onboarding'
 import { supabase } from '@/lib/supabase/client'
 
@@ -18,11 +21,42 @@ export function SignupCheckEmailScreen() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [resending, setResending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
-  const email = searchParams.get('email')?.trim() ?? ''
+  const email = searchParams.get('email')?.trim() || getPendingSignup()?.email || ''
 
   useEffect(() => {
     let active = true
+
+    async function continueAfterVerification(emailFromSignal?: string | null) {
+      if (!active) {
+        return
+      }
+
+      setVerifying(true)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!active) {
+        return
+      }
+
+      clearSignupConfirmationSignal()
+
+      if (session) {
+        router.replace(await getPostAuthRoute())
+        return
+      }
+
+      const nextEmail = emailFromSignal ?? email
+      router.replace(
+        nextEmail
+          ? `/signup/continue?email=${encodeURIComponent(nextEmail)}`
+          : '/signup/continue'
+      )
+    }
 
     async function loadUser() {
       const {
@@ -31,15 +65,43 @@ export function SignupCheckEmailScreen() {
 
       if (active && user) {
         router.replace(await getPostAuthRoute())
+        return
+      }
+
+      const existingSignal = getSignupConfirmationSignal()
+
+      if (existingSignal) {
+        await continueAfterVerification(existingSignal.email)
       }
     }
 
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active || !session) {
+        return
+      }
+
+      clearSignupConfirmationSignal()
+      void getPostAuthRoute().then((route) => router.replace(route))
+    })
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key === 'tastebuds:signup-confirmation-signal' && event.newValue) {
+        const signal = getSignupConfirmationSignal()
+        if (signal) {
+          void continueAfterVerification(signal.email)
+        }
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
     void loadUser()
 
     return () => {
       active = false
+      authListener.subscription.unsubscribe()
+      window.removeEventListener('storage', handleStorage)
     }
-  }, [router])
+  }, [email, router])
 
   async function handleResend() {
     if (!email) {
@@ -75,59 +137,61 @@ export function SignupCheckEmailScreen() {
   }
 
   return (
-    <AuthShell
-      aside={
-        <>
-          <h1 className="mt-4 text-5xl font-bold tracking-[-0.05em] text-[color:var(--foreground)]">
+    <main className="min-h-screen bg-[color:var(--background)] px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-[2rem] border border-[color:var(--nav-border)] bg-[color:var(--nav-bg)] px-6 py-5 text-white shadow-[0_18px_42px_rgba(0,20,38,0.18)]">
+          <TastebudsLogo showTagline size="sm" theme="dark" />
+        </div>
+
+        <section className="mt-6 rounded-[2rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-8 shadow-[0_24px_56px_rgba(0,20,38,0.08)] sm:p-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--accent-strong)]">
+            Email confirmation
+          </p>
+          <h1 className="mt-3 text-[2.5rem] font-bold tracking-[-0.05em] text-[color:var(--foreground)]">
             Check your email
           </h1>
-          <p className="mt-5 max-w-xl text-lg leading-8 text-[color:var(--text-secondary)]">
-            Open the confirmation link to keep moving through your Tastebuds setup.
+          <p className="mt-4 text-base leading-7 text-[color:var(--text-secondary)]">
+            We&apos;ve sent you a confirmation link. Open it to continue setting up your
+            Tastebuds profile.
           </p>
-        </>
-      }
-      asideTitle="Sign up"
-      title="Check your email"
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--accent-strong)]">
-        Email confirmation
-      </p>
-      <h1 className="mt-3 text-[2.4rem] font-bold tracking-[-0.05em] text-[color:var(--foreground)]">
-        Check your email
-      </h1>
-      <p className="mt-4 text-base leading-7 text-[color:var(--text-secondary)]">
-        We&apos;ve sent you a confirmation link. Open it to continue setting up your Tastebuds
-        profile.
-      </p>
-      <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)]">
-        If it does not arrive, check your spam folder.
-      </p>
-      {email ? (
-        <p className="mt-4 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)]">
-          Sent to {email}
-        </p>
-      ) : null}
+          <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)]">
+            If it does not arrive, check your spam folder.
+          </p>
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Button disabled={resending || !email} onClick={() => void handleResend()}>
-          {resending ? 'Resending...' : 'Resend email'}
-        </Button>
-        <Button onClick={handleBackToSignup} variant="secondary">
-          Back to sign up
-        </Button>
+          {email ? (
+            <p className="mt-5 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)]">
+              Sent to {email}
+            </p>
+          ) : null}
+
+          {verifying ? (
+            <p className="mt-5 rounded-[1.5rem] border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-4 py-3 text-sm font-medium text-[color:var(--accent-strong)]">
+              Email verified. Continuing your onboarding...
+            </p>
+          ) : null}
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button disabled={resending || verifying || !email} onClick={() => void handleResend()}>
+              {resending ? 'Resending...' : 'Resend email'}
+            </Button>
+            <Button disabled={verifying} onClick={handleBackToSignup} variant="secondary">
+              Back to sign up
+            </Button>
+          </div>
+
+          {error ? (
+            <p className="mt-4 rounded-[1.5rem] border border-[color:color-mix(in_srgb,var(--accent)_28%,white)] bg-[color:color-mix(in_srgb,var(--accent)_10%,var(--surface))] p-3 text-sm text-[color:var(--accent-strong)]">
+              {error}
+            </p>
+          ) : null}
+
+          {message ? (
+            <p className="mt-4 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-3 text-sm text-[color:var(--foreground)]">
+              {message}
+            </p>
+          ) : null}
+        </section>
       </div>
-
-      {error ? (
-        <p className="mt-4 rounded-[1.5rem] border border-[color:color-mix(in_srgb,var(--accent)_28%,white)] bg-[color:color-mix(in_srgb,var(--accent)_10%,var(--surface))] p-3 text-sm text-[color:var(--accent-strong)]">
-          {error}
-        </p>
-      ) : null}
-
-      {message ? (
-        <p className="mt-4 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-3 text-sm text-[color:var(--foreground)]">
-          {message}
-        </p>
-      ) : null}
-    </AuthShell>
+    </main>
   )
 }
