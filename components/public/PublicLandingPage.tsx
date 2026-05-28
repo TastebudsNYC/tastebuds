@@ -171,16 +171,26 @@ export function PublicLandingPage({
     <main className="landing-page min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="fixed inset-x-0 top-0 z-50">
         <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
-          <Link aria-label="Tastebuds home" href="/">
-            <Image
-              alt="Tastebuds"
-              className="h-auto w-[148px] lg:w-[220px]"
-              height={71}
-              priority
-              src="/assets/tastebuds_logo_dark_header_transparent.png"
-              width={220}
-            />
-          </Link>
+          <div className="flex w-full items-center justify-between gap-4">
+            <Link aria-label="Tastebuds home" href="/">
+              <Image
+                alt="Tastebuds"
+                className="h-auto w-[148px] lg:w-[220px]"
+                height={71}
+                priority
+                src="/assets/tastebuds_logo_dark_header_transparent.png"
+                width={220}
+              />
+            </Link>
+            <div className="flex items-center gap-3">
+              <Link className="landing-button landing-button-dark" href="/login">
+                Log in
+              </Link>
+              <Link className="landing-button landing-button-primary" href="/signup">
+                Get started
+              </Link>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -205,11 +215,11 @@ export function PublicLandingPage({
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link className="landing-button landing-button-primary" href="/signup">
-                Build your taste profile
+                Get started
               </Link>
-              <a className="landing-button landing-button-secondary" href="#events">
-                See open tables
-              </a>
+              <Link className="landing-button landing-button-secondary" href="/login">
+                Log in
+              </Link>
             </div>
           </div>
         </div>
@@ -461,11 +471,11 @@ export function PublicLandingPage({
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link className="landing-button landing-button-primary" href="/signup">
-                Build my taste profile
+                Get started
               </Link>
-              <a className="landing-button landing-button-dark" href="#events">
-                Browse tables
-              </a>
+              <Link className="landing-button landing-button-dark" href="/login">
+                Log in
+              </Link>
             </div>
           </div>
         </div>

@@ -120,7 +120,7 @@ export function LocationSearchField({
 
   const helperText = useMemo(() => {
     if (!providerConfigured) {
-      return 'Set GOOGLE_MAPS_API_KEY on the server to enable address lookup.'
+      return 'Location lookup is not configured right now.'
     }
 
     if (error) {
@@ -128,7 +128,7 @@ export function LocationSearchField({
     }
 
     if (loading) {
-      return 'Searching Manhattan addresses...'
+      return 'Searching nearby areas...'
     }
 
     if (selectionCommitted) {
@@ -136,7 +136,7 @@ export function LocationSearchField({
     }
 
     if (trimmedQuery.length >= 3 && suggestions.length === 0) {
-      return 'No Manhattan matches found. Try a fuller street address or neighborhood.'
+      return 'We couldn’t find that area. Try a nearby city, neighbourhood or fuller address.'
     }
 
     return description
@@ -198,7 +198,7 @@ export function LocationSearchField({
                   {suggestion.label}
                 </span>
                 <span className="tb-label mt-1 block text-xs">
-                  {suggestion.secondaryLabel ?? 'Manhattan'}
+                  {suggestion.secondaryLabel ?? 'Suggested area'}
                 </span>
               </span>
               <span className="tb-label text-xs">{suggestion.subregion}</span>
