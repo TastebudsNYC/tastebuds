@@ -170,7 +170,7 @@ export function PublicLandingPage({
   return (
     <main className="landing-page min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="fixed inset-x-0 top-0 z-50">
-        <div className="mx-auto grid max-w-[1440px] grid-cols-1 lg:grid-cols-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="landing-nav flex h-[72px] items-center px-6 lg:h-[108px] lg:px-[72px]">
             <Link aria-label="Tastebuds home" href="/">
               <Image
