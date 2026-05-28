@@ -134,12 +134,14 @@ function StageShell({
   backLabel,
   children,
   currentStep,
+  showLoginLink = true,
   onBack,
   progressTotal,
 }: {
   backLabel?: string
   children: React.ReactNode
   currentStep: number
+  showLoginLink?: boolean
   onBack?: () => void
   progressTotal: number
 }) {
@@ -184,12 +186,16 @@ function StageShell({
               ) : (
                 <span />
               )}
-              <Link
-                className="text-sm font-semibold text-[color:var(--text-secondary)] transition hover:text-[color:var(--foreground)]"
-                href="/login"
-              >
-                Log in
-              </Link>
+              {showLoginLink ? (
+                <Link
+                  className="text-sm font-semibold text-[color:var(--text-secondary)] transition hover:text-[color:var(--foreground)]"
+                  href="/login"
+                >
+                  Log in
+                </Link>
+              ) : (
+                <span />
+              )}
             </div>
             {children}
           </div>
@@ -702,7 +708,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
   if (!sessionChecked) {
     return (
-      <StageShell currentStep={1} progressTotal={visibleStages.length}>
+      <StageShell currentStep={1} progressTotal={visibleStages.length} showLoginLink={!authenticated}>
         <StageHeading
           heading="Preparing your setup"
           subtext="Loading your account and profile so you can carry on where you left off."
@@ -726,6 +732,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       backLabel={stage === 'account-password' ? 'Back' : 'Previous'}
       currentStep={currentStep}
       progressTotal={visibleStages.length}
+      showLoginLink={!authenticated}
       {...(canGoBack ? { onBack: goBack } : {})}
     >
       {stage === 'welcome-1' ? (
@@ -923,7 +930,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
                 subregion: suggestion.subregion,
               }))
             }
-            placeholder="Bath, Bristol, Long Island City..."
+            placeholder="Upper West Side, Harlem, East Village..."
             query={draft.homeAnchorQuery}
             setQuery={(value) =>
               setDraft((current) => ({
