@@ -1415,6 +1415,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             selectedRestaurant
           }
           saving={restaurantActionLoadingId === selectedRestaurant.id}
+          showEventsAction={false}
         />
       ) : null}
     </StageShell>

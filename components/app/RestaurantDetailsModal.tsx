@@ -43,11 +43,13 @@ export function RestaurantDetailsModal({
   onToggleSaved,
   restaurant,
   saving,
+  showEventsAction = true,
 }: {
   onClose: () => void
   onToggleSaved?: (restaurantId: number, action: 'save' | 'unsave') => void
   restaurant: DashboardRestaurant
   saving?: boolean
+  showEventsAction?: boolean
 }) {
   const [loading, setLoading] = useState(Boolean(restaurant.googlePlaceId))
   const [error, setError] = useState('')
@@ -247,7 +249,7 @@ export function RestaurantDetailsModal({
                   {saving ? 'Updating...' : restaurant.isSaved ? 'Unsave' : 'Save restaurant'}
                 </Button>
               ) : null}
-              {eventsHref ? (
+              {showEventsAction && eventsHref ? (
                 <Button href={eventsHref} variant="secondary">
                   See events
                 </Button>
