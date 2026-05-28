@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { AnimatedNumber } from '@/components/app/AnimatedNumber'
 import { Button } from '@/components/app/Button'
@@ -143,22 +143,7 @@ export function TasteProfileRail({ profile }: { profile: Profile | null }) {
   )
 }
 
-export function ActivityRail({
-  highlightedRestaurantId,
-  mapAnchorId = 'activity-map',
-  mapLegendMode = 'all',
-  mapPrimaryActionLabel = 'Open details',
-  mapRestaurants,
-  onExpandedSelectRestaurant,
-  notifications,
-  onHighlightRestaurant,
-  onInlineSelectRestaurant,
-  onSelectRestaurant,
-  restaurants,
-  selectedRestaurantId,
-  showWatching = true,
-  userLocation,
-}: {
+type ActivityRailProps = {
   highlightedRestaurantId?: number | null
   mapAnchorId?: string
   mapLegendMode?: 'all' | 'live-only'
@@ -172,54 +157,28 @@ export function ActivityRail({
   restaurants: DashboardRestaurant[]
   selectedRestaurantId: number | null
   showWatching?: boolean
-  userLocation: { lat: number; lng: number } | null
-}) {
+  userLocation?: { lat: number; lng: number } | null
+}
+
+export function ActivityRail(props: ActivityRailProps) {
+  const {
+    highlightedRestaurantId,
+    mapAnchorId = 'activity-map',
+    mapLegendMode = 'all',
+    mapPrimaryActionLabel = 'Open details',
+    mapRestaurants,
+    onExpandedSelectRestaurant,
+    notifications,
+    onHighlightRestaurant,
+    onSelectRestaurant,
+    restaurants,
+    selectedRestaurantId,
+    showWatching = true,
+  } = props
   const unreadNotificationCount = notifications.filter((item) => !item.read_at).length
-  const previousRestaurantIdsRef = useRef<number[]>(restaurants.map((restaurant) => restaurant.id))
-  const previousUnreadRef = useRef(unreadNotificationCount)
-  const [freshRestaurantIds, setFreshRestaurantIds] = useState<number[]>([])
   const [expandedPreviewRestaurantId, setExpandedPreviewRestaurantId] = useState<number | null>(null)
   const [isMapOpen, setIsMapOpen] = useState(false)
-  const [pulseUnreadDot, setPulseUnreadDot] = useState(false)
   const displayedMapRestaurants = mapRestaurants ?? restaurants
-
-  useEffect(() => {
-    const previousIds = previousRestaurantIdsRef.current
-    const nextIds = restaurants.map((restaurant) => restaurant.id)
-    const addedIds = nextIds.filter((id) => !previousIds.includes(id))
-
-    previousRestaurantIdsRef.current = nextIds
-
-    if (addedIds.length === 0) {
-      return
-    }
-
-    setFreshRestaurantIds(addedIds)
-    const timeoutId = window.setTimeout(() => setFreshRestaurantIds([]), 420)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [restaurants])
-
-  useEffect(() => {
-    if (unreadNotificationCount <= previousUnreadRef.current) {
-      previousUnreadRef.current = unreadNotificationCount
-      return
-    }
-
-    previousUnreadRef.current = unreadNotificationCount
-    setPulseUnreadDot(true)
-    const timeoutId = window.setTimeout(() => setPulseUnreadDot(false), 380)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [unreadNotificationCount])
-
-  useEffect(() => {
-    if (!isMapOpen) {
-      return
-    }
-
-    setExpandedPreviewRestaurantId(highlightedRestaurantId ?? selectedRestaurantId ?? displayedMapRestaurants[0]?.id ?? null)
-  }, [displayedMapRestaurants, highlightedRestaurantId, isMapOpen, selectedRestaurantId])
 
   return (
     <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start xl:border-l xl:border-[color:var(--border-soft)] xl:pl-8">
@@ -303,9 +262,7 @@ export function ActivityRail({
             {restaurants.length > 0 ? (
               restaurants.map((restaurant) => (
                 <div
-                  className={`grid grid-cols-[3.25rem_1fr_auto] items-center gap-3 ${
-                    freshRestaurantIds.includes(restaurant.id) ? 'tb-slide-fade-in' : ''
-                  }`}
+                  className="grid grid-cols-[3.25rem_1fr_auto] items-center gap-3"
                   key={restaurant.id}
                 >
                   <GooglePlacePhoto
@@ -347,7 +304,7 @@ export function ActivityRail({
             </Link>
           </div>
           <div className="mt-6 flex items-start gap-4">
-            <span className={`mt-1 h-3 w-3 shrink-0 rounded-full bg-[color:var(--accent)] ${pulseUnreadDot ? 'tb-unread-pulse-once' : ''}`} />
+            <span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-[color:var(--accent)]" />
             <div>
               <p className="text-lg font-semibold text-[color:var(--accent)]">
                 <AnimatedNumber value={unreadNotificationCount} /> unread update{unreadNotificationCount === 1 ? '' : 's'}
@@ -396,7 +353,13 @@ export function ActivityRail({
             }
           }}
           previewActionLabel={mapPrimaryActionLabel}
-          previewedRestaurantId={expandedPreviewRestaurantId}
+          previewedRestaurantId={
+            expandedPreviewRestaurantId ??
+            highlightedRestaurantId ??
+            selectedRestaurantId ??
+            displayedMapRestaurants[0]?.id ??
+            null
+          }
           restaurants={displayedMapRestaurants}
           showUserMarker={false}
           title="Nearby matches"
