@@ -22,6 +22,7 @@ export function SignupCheckEmailScreen() {
   const [message, setMessage] = useState('')
   const [resending, setResending] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [continuing, setContinuing] = useState(false)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   const email = searchParams.get('email')?.trim() || getPendingSignup()?.email || ''
 
@@ -131,6 +132,35 @@ export function SignupCheckEmailScreen() {
     setMessage('Confirmation email resent.')
   }
 
+  async function handleContinueSetup() {
+    const nextEmail = email
+
+    setContinuing(true)
+    setError('')
+    setMessage('')
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    setContinuing(false)
+
+    if (sessionError) {
+      setError(sessionError.message)
+      return
+    }
+
+    if (session) {
+      router.replace(await getPostAuthRoute())
+      return
+    }
+
+    router.replace(
+      nextEmail ? `/signup/continue?email=${encodeURIComponent(nextEmail)}` : '/signup/continue'
+    )
+  }
+
   function handleBackToSignup() {
     clearPendingSignup()
     router.replace('/signup')
@@ -157,6 +187,9 @@ export function SignupCheckEmailScreen() {
           <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)]">
             If it does not arrive, check your spam folder.
           </p>
+          <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)]">
+            If you already clicked the email in another tab, come back here and continue.
+          </p>
 
           {email ? (
             <p className="mt-5 rounded-[1.5rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)]">
@@ -171,10 +204,13 @@ export function SignupCheckEmailScreen() {
           ) : null}
 
           <div className="mt-8 flex flex-wrap gap-3">
+            <Button disabled={continuing || verifying} onClick={() => void handleContinueSetup()}>
+              {continuing ? 'Checking confirmation...' : 'I’ve verified my email'}
+            </Button>
             <Button disabled={resending || verifying || !email} onClick={() => void handleResend()}>
               {resending ? 'Resending...' : 'Resend email'}
             </Button>
-            <Button disabled={verifying} onClick={handleBackToSignup} variant="secondary">
+            <Button disabled={verifying || continuing} onClick={handleBackToSignup} variant="secondary">
               Back to sign up
             </Button>
           </div>
