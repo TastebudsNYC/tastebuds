@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
@@ -147,12 +147,11 @@ function StageShell({
 }) {
   const progress = progressTotal <= 1 ? 1 : currentStep / progressTotal
   const stageAccent = getStageAccentClass(stageId)
-  const stagePanelCopy = getStagePanelCopy(stageId)
 
   return (
     <main className={`tb-onboarding-shell ${stageAccent}`}>
       <div className="tb-onboarding-backdrop" />
-      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+      <div className="relative flex min-h-screen flex-col">
         <header className="tb-onboarding-header">
           <TastebudsLogo showTagline={false} size="sm" theme="dark" />
           <div className="flex min-w-[180px] flex-col items-end gap-2">
@@ -171,51 +170,32 @@ function StageShell({
                 <span>Setup</span>
                 <span>
                   {currentStep}
-                  {' '}
-                  /
-                  {' '}
+                  {' '} / {' '}
                   {progressTotal}
                 </span>
-              </div>
-              <div className="mt-2 h-px overflow-hidden bg-white/12">
-                <div
-                  className="h-full bg-[color:var(--accent)] transition-[width] duration-500 ease-out"
-                  style={{ width: `${Math.max(progress, 0.06) * 100}%` }}
-                />
               </div>
             </div>
           </div>
         </header>
 
-        <section className="flex flex-1 py-4 lg:py-6">
-          <div className="tb-onboarding-frame">
-            <div className="tb-onboarding-rail">
-              <div className="relative z-10 max-w-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f4d08a]">
-                  Tastebuds setup
-                </p>
-                <h2 className="mt-5 text-[2.4rem] font-bold leading-[0.95] tracking-[-0.06em] text-white sm:text-[3rem]">
-                  {stagePanelCopy.title}
-                </h2>
-                <p className="mt-5 text-base leading-7 text-white/68">
-                  {stagePanelCopy.copy}
-                </p>
-              </div>
-              <div className="tb-onboarding-rail-glow" />
-            </div>
+        <div className="tb-onboarding-progress-track">
+          <div
+            className="tb-onboarding-progress-bar"
+            style={{ width: `${Math.max(progress, 0.06) * 100}%` }}
+          />
+        </div>
 
-            <div className="tb-onboarding-content-pane">
-              <div className="tb-onboarding-step" key={stageId}>
-                <div className="tb-onboarding-content">
-                  {children}
-                </div>
-                <footer className="tb-onboarding-footer">
-                  {footer}
-                </footer>
-              </div>
+        <section className="tb-onboarding-main">
+          <div className="tb-onboarding-step" key={stageId}>
+            <div className="tb-onboarding-content">
+              {children}
             </div>
           </div>
         </section>
+
+        <footer className="tb-onboarding-footer">
+          <div className="tb-onboarding-footer-inner">{footer}</div>
+        </footer>
       </div>
     </main>
   )
@@ -251,19 +231,22 @@ function ChoiceChip({
   active,
   children,
   onClick,
+  style,
 }: {
   active: boolean
   children: React.ReactNode
   onClick: () => void
+  style?: CSSProperties
 }) {
   return (
     <button
       className={
         active
-          ? 'min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--accent)] bg-[color:var(--accent)] px-5 py-4 text-left text-base font-semibold text-[color:var(--accent-text)] shadow-[0_16px_30px_rgba(245,158,11,0.24)] transition'
-          : 'min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--border-soft)] bg-white px-5 py-4 text-left text-base font-medium text-[color:var(--foreground)] transition hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-soft)]'
+          ? 'tb-onboarding-choice min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--accent)] bg-[color:var(--accent)] px-5 py-4 text-left text-base font-semibold text-[color:var(--accent-text)] shadow-[0_16px_30px_rgba(245,158,11,0.24)]'
+          : 'tb-onboarding-choice min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--border-soft)] bg-white px-5 py-4 text-left text-base font-medium text-[color:var(--foreground)] hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-soft)]'
       }
       onClick={onClick}
+      style={style}
       type="button"
     >
       {children}
@@ -288,11 +271,12 @@ function ChoiceGroup({
         {label}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {options.map((option) => (
+        {options.map((option, index) => (
           <ChoiceChip
             active={selected.includes(option)}
             key={option}
             onClick={() => onToggle(option)}
+            style={{ animationDelay: `${index * 45}ms` }}
           >
             {option}
           </ChoiceChip>
@@ -316,78 +300,6 @@ function getStageAccentClass(stage: StageId | 'loading') {
   }
 
   return 'tb-onboarding-theme-profile'
-}
-
-function getStagePanelCopy(stage: StageId | 'loading') {
-  if (stage === 'loading') {
-    return {
-      copy: 'Restoring your account and the next onboarding step.',
-      title: 'Getting your setup ready',
-    }
-  }
-
-  if (stage.startsWith('welcome')) {
-    return {
-      copy: 'A guided setup that stays focused on the kind of night, table and people you would actually say yes to.',
-      title: 'Build your first Tastebuds night',
-    }
-  }
-
-  if (stage.startsWith('account')) {
-    return {
-      copy: 'Create the account that keeps your profile, saved places and live table plans in sync.',
-      title: 'Create your Tastebuds account',
-    }
-  }
-
-  if (stage === 'home-area' || stage === 'preferred-area' || stage === 'travel') {
-    return {
-      copy: 'Keep the suggestions realistic by telling us where you start and how far a good plan can pull you.',
-      title: 'Set the ground rules',
-    }
-  }
-
-  if (
-    stage === 'price' ||
-    stage === 'cuisines' ||
-    stage === 'dietary' ||
-    stage === 'drinks'
-  ) {
-    return {
-      copy: 'Tell Tastebuds what you would genuinely book, not the theoretical version of your perfect night out.',
-      title: 'Shape the table around taste',
-    }
-  }
-
-  if (
-    stage === 'energy-scene' ||
-    stage === 'music-setting' ||
-    stage === 'vibes'
-  ) {
-    return {
-      copy: 'The room matters. Energy, setting and mood are what make the same restaurant feel right or wrong.',
-      title: 'Dial in the vibe',
-    }
-  }
-
-  if (stage === 'crowd-conversation' || stage === 'group-age') {
-    return {
-      copy: 'A good night is about more than the venue. Set the sort of table dynamic that feels easy to join.',
-      title: 'Set the social feel',
-    }
-  }
-
-  if (stage === 'restaurants') {
-    return {
-      copy: 'Start from real places you would book so the dashboard has immediate shape after setup.',
-      title: 'Save a few real starting points',
-    }
-  }
-
-  return {
-    copy: 'You are one step away from a profile that actually reflects how you like to go out.',
-    title: 'Almost there',
-  }
 }
 
 function formatRestaurantMeta(restaurant: DashboardRestaurant) {
@@ -839,7 +751,7 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       : 'Save 2 to continue'
     : `${savedRestaurantCount} saved`
   const inputClassName =
-    'tb-input min-h-[4.35rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/92 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.04)]'
+    'tb-input min-h-[4.65rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/94 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.05)]'
   const canContinueFromFooter =
     stage === 'drinks'
       ? true
