@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import {
   calculateDistanceKm,
   describeVenueMatch,
+  getVenueMatchFactors,
   calculateRestaurantMatchScore,
   type EventForScoring,
   type ProfileForScoring,
@@ -103,6 +104,7 @@ type ProfileRow = {
   preferred_scene: string[] | null
   preferred_setting: string[] | null
   preferred_vibes: string[] | null
+  profile_photo_url: string | null
   subregion: string | null
 }
 
@@ -148,7 +150,7 @@ export async function GET(request: Request) {
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
       .select(
-        'age_range_comfort, bio, conversation_preference, cuisine_preferences, dietary_restrictions, display_name, drinking_preferences, group_size_comfort, home_latitude, home_longitude, id, intent, max_travel_minutes, neighbourhood, preferred_crowd, preferred_energy, preferred_music, preferred_price, preferred_scene, preferred_setting, preferred_vibes, subregion'
+        'age_range_comfort, bio, conversation_preference, cuisine_preferences, dietary_restrictions, display_name, drinking_preferences, group_size_comfort, home_latitude, home_longitude, id, intent, max_travel_minutes, neighbourhood, preferred_crowd, preferred_energy, preferred_music, preferred_price, preferred_scene, preferred_setting, preferred_vibes, profile_photo_url, subregion'
       )
       .eq('id', user.id)
       .maybeSingle<ProfileRow>()
@@ -303,9 +305,25 @@ export async function GET(request: Request) {
     const { data: attendeeProfiles, error: attendeeProfilesError } = attendeeUserIds.length
       ? await adminClient
           .from('profiles')
-          .select('display_name, id')
+          .select(
+            'bio, conversation_preference, cuisine_preferences, display_name, id, neighbourhood, preferred_crowd, preferred_energy, preferred_scene, profile_photo_url, subregion'
+          )
           .in('id', attendeeUserIds)
-          .returns<{ display_name: string | null; id: string }[]>()
+          .returns<
+            {
+              bio: string | null
+              conversation_preference: string[] | null
+              cuisine_preferences: string[] | null
+              display_name: string | null
+              id: string
+              neighbourhood: string | null
+              preferred_crowd: string[] | null
+              preferred_energy: string[] | null
+              preferred_scene: string[] | null
+              profile_photo_url: string | null
+              subregion: string | null
+            }[]
+          >()
       : { data: [], error: null }
 
     if (attendeeProfilesError) {
@@ -326,8 +344,17 @@ export async function GET(request: Request) {
     const attendeePreviewByEvent = new Map<
       number,
       {
+        bio: string | null
+        conversationPreference: string[] | null
         dayOfConfirmationStatus: SignupRow['day_of_confirmation_status']
         displayName: string
+        cuisinePreferences: string[] | null
+        neighbourhood: string | null
+        preferredCrowd: string[] | null
+        preferredEnergy: string[] | null
+        preferredScene: string[] | null
+        profilePhotoUrl: string | null
+        subregion: string | null
       }[]
     >()
     const confirmedTodayCountByEvent = new Map<number, number>()
@@ -352,9 +379,25 @@ export async function GET(request: Request) {
         attendeePreviewByEvent.set(signup.event_id, [
           ...(attendeePreviewByEvent.get(signup.event_id) ?? []),
           {
+            bio: attendeeProfileById.get(signup.user_id)?.bio ?? null,
+            conversationPreference:
+              attendeeProfileById.get(signup.user_id)?.conversation_preference ?? null,
             dayOfConfirmationStatus: signup.day_of_confirmation_status,
             displayName:
               attendeeProfileById.get(signup.user_id)?.display_name ?? 'Someone',
+            cuisinePreferences:
+              attendeeProfileById.get(signup.user_id)?.cuisine_preferences ?? null,
+            neighbourhood:
+              attendeeProfileById.get(signup.user_id)?.neighbourhood ?? null,
+            preferredCrowd:
+              attendeeProfileById.get(signup.user_id)?.preferred_crowd ?? null,
+            preferredEnergy:
+              attendeeProfileById.get(signup.user_id)?.preferred_energy ?? null,
+            preferredScene:
+              attendeeProfileById.get(signup.user_id)?.preferred_scene ?? null,
+            profilePhotoUrl:
+              attendeeProfileById.get(signup.user_id)?.profile_photo_url ?? null,
+            subregion: attendeeProfileById.get(signup.user_id)?.subregion ?? null,
           },
         ])
       }
@@ -515,6 +558,8 @@ export async function GET(request: Request) {
           google_serves_vegetarian_food: event.google_serves_vegetarian_food,
           google_serves_wine: event.google_serves_wine,
           isJoined: userSignup?.status === 'going',
+          isVenueSaved:
+            event.restaurant_id !== null && savedRestaurantIds.has(event.restaurant_id),
           menu_experience_tags: event.menu_experience_tags,
           minimumViableAttendees: event.minimum_viable_attendees,
           needsDayOfConfirmation,
@@ -533,6 +578,7 @@ export async function GET(request: Request) {
           venue_good_for_dinner: event.venue_good_for_dinner,
           venue_group_friendly: event.venue_group_friendly,
           venue_indoor_outdoor: event.venue_indoor_outdoor,
+          venueMatchFactors: getVenueMatchFactors(scoringProfile, scoringEvent),
           venueMatchSummary: describeVenueMatch(scoringProfile, scoringEvent),
           shouldReconsiderGoing,
           signupStatus: userSignup?.status ?? null,

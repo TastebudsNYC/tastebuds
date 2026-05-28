@@ -1,40 +1,58 @@
 import type { ReactNode } from 'react'
-import { Epilogue } from 'next/font/google'
 
 import { cx } from '@/lib/app/format'
+import type { Profile } from '@/lib/app/types'
 
 import { BottomNav } from '@/components/app/BottomNav'
 import { SiteFooter } from '@/components/app/SiteFooter'
 import { TopNav } from '@/components/app/TopNav'
 
-const epilogue = Epilogue({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800', '900'],
-})
-
 export function AppShell({
   children,
   currentPath,
+  liveTableCount,
   onLogout,
+  profile,
+  savedVenueCount,
+  showFooter = false,
+  unreadCount = 0,
+  wide = false,
 }: {
   children: ReactNode
   currentPath: string
+  liveTableCount?: number
   onLogout?: () => void
+  profile?: Profile | null
+  savedVenueCount?: number
+  showFooter?: boolean
+  unreadCount?: number
+  wide?: boolean
 }) {
-  const topNavProps = onLogout
-    ? { currentPath, onLogout }
-    : { currentPath }
+  const topNavProps = {
+    currentPath,
+    ...(liveTableCount !== undefined ? { liveTableCount } : {}),
+    ...(onLogout ? { onLogout } : {}),
+    ...(profile !== undefined ? { profile } : {}),
+    ...(savedVenueCount !== undefined ? { savedVenueCount } : {}),
+    ...(unreadCount !== undefined ? { unreadCount } : {}),
+    ...(wide ? { wide } : {}),
+  }
 
   return (
-    <main className={cx(epilogue.className, 'tb-surface-bg min-h-screen text-[color:var(--foreground)]')}>
+    <main className="tb-surface-bg min-h-screen text-[color:var(--foreground)]">
       <TopNav {...topNavProps} />
-      <div className="mx-auto w-full max-w-7xl px-6 py-10 pb-28 lg:px-8 lg:py-14">
-        <div className={cx('space-y-10 pb-6 sm:space-y-12 lg:pb-10')}>
+      <div
+        className={cx(
+          'mx-auto w-full py-10 pb-28 lg:py-14',
+          wide ? 'px-[clamp(1.5rem,4vw,4rem)]' : 'max-w-7xl px-6 lg:px-8'
+        )}
+      >
+        <div className={cx('tb-page-enter space-y-10 pb-6 sm:space-y-12 lg:pb-10')}>
           {children}
         </div>
       </div>
-      <SiteFooter />
-      <BottomNav currentPath={currentPath} />
+      {showFooter ? <SiteFooter /> : null}
+      <BottomNav currentPath={currentPath} unreadCount={unreadCount} />
     </main>
   )
 }

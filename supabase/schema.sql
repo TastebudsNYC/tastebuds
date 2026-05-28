@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   intent text not null check (intent in ('dating', 'friendship')),
   max_travel_minutes integer not null check (max_travel_minutes in (15, 30, 45)),
   bio text,
+  profile_photo_url text,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -316,7 +317,9 @@ create table if not exists public.restaurants (
   google_good_for_watching_sports boolean,
   google_live_music boolean,
   google_outdoor_seating boolean,
+  google_photo_refs text[] not null default '{}',
   google_reservable boolean,
+  google_business_status text,
   google_serves_beer boolean,
   google_serves_brunch boolean,
   google_serves_cocktails boolean,
@@ -324,9 +327,12 @@ create table if not exists public.restaurants (
   google_serves_dinner boolean,
   google_serves_vegetarian_food boolean,
   google_serves_wine boolean,
+  google_types text[] not null default '{}',
+  google_primary_type text,
   google_editorial_summary text,
   google_phone_number text,
   google_website_uri text,
+  google_last_synced_at timestamptz,
   venue_latitude double precision,
   venue_longitude double precision,
   venue_energy text check (venue_energy in ('Chill', 'Moderate', 'High')),
@@ -362,6 +368,32 @@ where archived_at is null;
 create unique index if not exists restaurants_google_place_id_idx
 on public.restaurants (google_place_id)
 where google_place_id is not null;
+
+create table if not exists public.venue_traits (
+  restaurant_id bigint primary key references public.restaurants(id) on delete cascade,
+  cuisine_tags text[] not null default '{}',
+  vibe_tags text[] not null default '{}',
+  setting_tags text[] not null default '{}',
+  social_fit_tags text[] not null default '{}',
+  price_band text check (price_band in ('$', '$$', '$$$', '$$$$')),
+  confidence_score numeric(4,2) not null default 0.5,
+  source text not null default 'google_places+rules',
+  generated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists venue_traits_generated_at_idx
+on public.venue_traits (generated_at desc);
+
+alter table public.venue_traits enable row level security;
+
+grant select on public.venue_traits to authenticated;
+
+drop policy if exists "Authenticated users can view venue traits" on public.venue_traits;
+create policy "Authenticated users can view venue traits"
+on public.venue_traits
+for select
+to authenticated
+using (true);
 
 alter table public.restaurants enable row level security;
 

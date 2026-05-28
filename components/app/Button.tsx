@@ -31,7 +31,7 @@ const VARIANT_STYLES = {
   primary:
     'border border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-text)] shadow-[0_10px_20px_rgba(245,158,11,0.3)] hover:border-[color:var(--accent-strong)] hover:bg-[color:var(--accent-hover)]',
   secondary:
-    'border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:border-[color:var(--accent)] hover:bg-[color:var(--surface)]',
+    'border border-[color:var(--border-soft)] bg-[color:var(--surface)] text-[color:var(--nav-bg)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-soft)]',
 } as const
 
 const SIZE_STYLES = {
@@ -47,7 +47,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classNames = cx(
-    'inline-flex items-center justify-center gap-2 transition disabled:cursor-not-allowed disabled:border-[color:var(--border-soft)] disabled:bg-[color:color-mix(in_srgb,var(--surface)_82%,var(--background))] disabled:text-[color:var(--text-muted)]',
+    'tb-pressable inline-flex items-center justify-center gap-2 transition disabled:cursor-not-allowed disabled:border-[color:var(--border-soft)] disabled:bg-[color:color-mix(in_srgb,var(--surface)_82%,var(--background))] disabled:text-[color:var(--text-muted)]',
     SIZE_STYLES[size],
     VARIANT_STYLES[variant],
     className

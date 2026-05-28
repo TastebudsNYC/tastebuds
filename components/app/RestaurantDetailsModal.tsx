@@ -1,12 +1,13 @@
 'use client'
 
-/* eslint-disable @next/next/no-img-element */
-
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/app/Button'
+import { ModalShell } from '@/components/app/ModalShell'
+import { VenuePhotoCarousel } from '@/components/app/VenuePhotoCarousel'
 import { formatGooglePriceLevel } from '@/lib/app/format'
 import type { DashboardRestaurant } from '@/lib/app/types'
+import type { GooglePlacePhotoResult } from '@/lib/google-places'
 
 type RestaurantDetailsResponse = {
   details?: {
@@ -22,6 +23,7 @@ type RestaurantDetailsResponse = {
     phoneNumber: string | null
     photoAuthorName: string | null
     photoUri: string | null
+    photos: GooglePlacePhotoResult[]
     priceLevel: string | null
     rating: number | null
     userRatingCount: number | null
@@ -113,37 +115,31 @@ export function RestaurantDetailsModal({
   const address = details?.formattedAddress ?? restaurant.formattedAddress
   const summary =
     details?.editorialSummary ?? restaurant.googleEditorialSummary ?? restaurant.venueMatchSummary
-  const photoUri = details?.photoUri ?? null
-  const photoAuthorName = details?.photoAuthorName ?? null
+  const photos = details?.photos ?? []
   const priceLevel = formatGooglePriceLevel(details?.priceLevel ?? restaurant.googlePriceLevel)
   const subtitle = getFallbackSubtitle(restaurant)
+  const eventsHref =
+    restaurant.availableEventCount > 0
+      ? `/events${restaurant.googlePlaceId ? `?place=${encodeURIComponent(restaurant.googlePlaceId)}` : ''}`
+      : null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_90px_rgba(20,20,20,0.28)]"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
+    <ModalShell className="max-w-5xl" onClose={onClose}>
+      {({ requestClose }) => (
+      <div className="max-h-[90vh] w-full overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_90px_rgba(20,20,20,0.28)]">
         <div className="grid max-h-[90vh] overflow-y-auto md:grid-cols-[1.1fr_1fr]">
-          <div className="relative min-h-80 bg-[#f5f3ee]">
-            {photoUri ? (
-              <img alt={restaurant.name} className="h-full w-full object-cover" src={photoUri} />
-            ) : (
-              <div className="flex h-full items-center justify-center px-8 text-center text-sm text-[color:var(--text-muted)]">
-                No Google photo available for this restaurant yet.
-              </div>
-            )}
-            {photoAuthorName ? (
-              <div className="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-white">
-                Photo by {photoAuthorName}
-              </div>
-            ) : null}
+          <div className="relative min-h-80 bg-[color:var(--surface-soft)]">
+            <VenuePhotoCarousel
+              alt={restaurant.name}
+              attributionClassName="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-white"
+              emptyState={
+                <div className="flex h-full items-center justify-center px-8 text-center text-sm text-[color:var(--text-muted)]">
+                  No Google photo available for this restaurant yet.
+                </div>
+              }
+              imageClassName="h-full w-full object-cover"
+              photos={photos}
+            />
           </div>
 
           <div className="p-6 md:p-8">
@@ -160,7 +156,7 @@ export function RestaurantDetailsModal({
               <button
                 aria-label="Close restaurant details"
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--border-soft)] text-xl text-[color:var(--text-muted)] transition hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]"
-                onClick={onClose}
+                onClick={requestClose}
                 type="button"
               >
                 x
@@ -175,19 +171,23 @@ export function RestaurantDetailsModal({
                 </span>
               ) : null}
               {details?.openNow !== null && details?.openNow !== undefined ? (
-                <span className="rounded-full bg-[#f4f4f2] px-3 py-1 text-sm font-semibold text-[color:var(--foreground)]">
+                <span className="rounded-full bg-[color:var(--surface-soft)] px-3 py-1 text-sm font-semibold text-[color:var(--status-text)]">
                   {details.openNow ? 'Open now' : 'Closed now'}
                 </span>
               ) : null}
               {priceLevel ? (
-                <span className="rounded-full bg-[#f4f4f2] px-3 py-1 text-sm font-semibold text-[color:var(--foreground)]">
+                <span className="rounded-full bg-[color:var(--surface-soft)] px-3 py-1 text-sm font-semibold text-[color:var(--foreground)]">
                   {priceLevel}
                 </span>
               ) : null}
             </div>
 
             {loading ? (
-              <p className="mt-6 text-sm text-[color:var(--text-muted)]">Loading Google details...</p>
+              <div className="mt-6 space-y-3">
+                <div className="tb-skeleton h-4 w-36 rounded-full" />
+                <div className="tb-skeleton h-4 w-full rounded-full" />
+                <div className="tb-skeleton h-4 w-5/6 rounded-full" />
+              </div>
             ) : null}
             {error ? (
               <p className="mt-6 rounded-[1.25rem] border border-[color:var(--accent-border)] bg-[color:var(--accent-softer)] p-4 text-sm text-[color:var(--accent-strong)]">
@@ -247,9 +247,11 @@ export function RestaurantDetailsModal({
                   {saving ? 'Updating...' : restaurant.isSaved ? 'Unsave' : 'Save restaurant'}
                 </Button>
               ) : null}
-              <Button href="/events" variant="secondary">
-                See events
-              </Button>
+              {eventsHref ? (
+                <Button href={eventsHref} variant="secondary">
+                  See events
+                </Button>
+              ) : null}
               {mapsUri ? (
                 <Button href={mapsUri} target="_blank" variant="secondary">
                   Open in Google Maps
@@ -264,6 +266,7 @@ export function RestaurantDetailsModal({
           </div>
         </div>
       </div>
-    </div>
+      )}
+    </ModalShell>
   )
 }

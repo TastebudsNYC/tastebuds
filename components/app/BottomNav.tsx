@@ -80,12 +80,19 @@ const NAV_ITEMS = [
   },
 ] as const
 
-export function BottomNav({ currentPath }: { currentPath: string }) {
+export function BottomNav({
+  currentPath,
+  unreadCount = 0,
+}: {
+  currentPath: string
+  unreadCount?: number
+}) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 px-3 py-3 backdrop-blur sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[color:var(--border-soft)] bg-white/95 px-3 py-3 backdrop-blur sm:hidden">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
         {NAV_ITEMS.map((item) => {
           const isActive = currentPath === item.href
+          const showUnreadBadge = item.href === '/notifications' && unreadCount > 0
 
           return (
             <Link
@@ -93,13 +100,16 @@ export function BottomNav({ currentPath }: { currentPath: string }) {
                 'min-w-0 flex-1 rounded-2xl px-2 py-2 text-center text-[11px] font-medium transition',
                 isActive
                   ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)]'
-                  : 'text-[color:var(--text-muted)] hover:bg-[#f5f3ee] hover:text-[color:var(--foreground)]'
+                  : 'text-[color:var(--text-muted)] hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]'
               )}
               href={item.href}
               key={item.href}
             >
-              <span className="flex flex-col items-center gap-1">
+              <span className="relative flex flex-col items-center gap-1">
                 {item.icon}
+                {showUnreadBadge ? (
+                  <span className="absolute right-3 top-0.5 h-2 w-2 rounded-full bg-[color:var(--accent)]" />
+                ) : null}
                 <span>{item.label}</span>
               </span>
             </Link>

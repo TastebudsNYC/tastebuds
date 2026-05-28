@@ -19,6 +19,7 @@ export type Profile = {
   preferred_scene: string[] | null
   preferred_setting: string[] | null
   preferred_vibes: string[] | null
+  profile_photo_url: string | null
   subregion: string | null
 }
 
@@ -43,8 +44,17 @@ export type NotificationSummary = {
 export type DashboardEvent = {
   attendeeCount: number
   attendeePreview: {
+    bio: string | null
+    conversationPreference: string[] | null
     dayOfConfirmationStatus: 'pending' | 'confirmed' | 'declined'
     displayName: string
+    cuisinePreferences: string[] | null
+    neighbourhood: string | null
+    preferredCrowd: string[] | null
+    preferredEnergy: string[] | null
+    preferredScene: string[] | null
+    profilePhotoUrl: string | null
+    subregion: string | null
   }[]
   canSubmitFeedback: boolean
   canViewAttendees: boolean
@@ -78,6 +88,7 @@ export type DashboardEvent = {
   id: number
   intent: 'dating' | 'friendship'
   isJoined: boolean
+  isVenueSaved: boolean
   minimumViableAttendees: number
   needsDayOfConfirmation: boolean
   menu_experience_tags?: string[] | null
@@ -105,6 +116,7 @@ export type DashboardEvent = {
   venue_good_for_dinner?: boolean | null
   venue_group_friendly?: boolean | null
   venue_indoor_outdoor?: string[] | null
+  venueMatchFactors: string[]
   venueMatchSummary: string
   venue_music: string[] | null
   venue_noise_level?: string | null
@@ -159,12 +171,14 @@ export type DashboardRestaurant = {
   googleWebsiteUri: string | null
   id: number
   isSaved: boolean
+  matchTags: string[]
   matchScore: number
   menu_experience_tags?: string[] | null
   name: string
   neighbourhood: string | null
   restaurant_cuisines: string[] | null
   subregion: string
+  topMatchFactors: string[]
   venue_latitude: number | null
   venue_longitude: number | null
   venueDistanceKm: number | null

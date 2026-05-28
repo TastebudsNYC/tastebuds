@@ -18,6 +18,7 @@ type NotificationInput = {
   body: string
   duplicateBehavior?: 'rearm' | 'skip'
   eventId?: number | null
+  suppressEmail?: boolean
   title: string
   type: NotificationType
   userId: string
@@ -60,17 +61,28 @@ async function rearmExistingNotification(
   }
 
   const nowIso = new Date().toISOString()
+  const emailFields = notification.suppressEmail
+    ? {
+        email_attempted_at: nowIso,
+        email_error: 'Email delivery suppressed for this notification.',
+        email_provider_id: null,
+        email_sent_at: null,
+        email_status: 'skipped',
+      }
+    : {
+        email_attempted_at: null,
+        email_error: null,
+        email_provider_id: null,
+        email_sent_at: null,
+        email_status: 'pending',
+      }
 
   const { data: updatedNotification, error: updateError } = await adminClient
     .from('notifications')
     .update({
       body: notification.body,
       created_at: nowIso,
-      email_attempted_at: null,
-      email_error: null,
-      email_provider_id: null,
-      email_sent_at: null,
-      email_status: 'pending',
+      ...emailFields,
       read_at: null,
       title: notification.title,
     })
@@ -188,6 +200,13 @@ export async function queueNotifications(notifications: NotificationInput[]) {
       .from('notifications')
       .insert({
         body: notification.body,
+        ...(notification.suppressEmail
+          ? {
+              email_attempted_at: new Date().toISOString(),
+              email_error: 'Email delivery suppressed for this notification.',
+              email_status: 'skipped',
+            }
+          : {}),
         event_id: notification.eventId ?? null,
         title: notification.title,
         type: notification.type,
@@ -204,7 +223,7 @@ export async function queueNotifications(notifications: NotificationInput[]) {
 
         const rearmedNotification = await rearmExistingNotification(adminClient, notification)
 
-        if (rearmedNotification) {
+        if (rearmedNotification && !notification.suppressEmail) {
           queuedNotifications.push(rearmedNotification)
         }
 
@@ -214,7 +233,7 @@ export async function queueNotifications(notifications: NotificationInput[]) {
       throw new Error(error.message)
     }
 
-    if (data) {
+    if (data && !notification.suppressEmail) {
       queuedNotifications.push(data)
     }
   }

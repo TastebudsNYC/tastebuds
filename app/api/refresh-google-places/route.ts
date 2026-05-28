@@ -1,122 +1,52 @@
 import { NextResponse } from 'next/server'
 
-import { getRestaurantPoiDetails } from '@/lib/google-places'
 import { requireAdminOrCron } from '@/lib/request-auth'
 import { createServerSupabaseAdminClient } from '@/lib/supabase/server'
+import {
+  buildRestaurantGoogleUpdate,
+  buildVenueTraitsUpsert,
+  deriveVenueTraits,
+  fetchVenueEnrichment,
+} from '@/lib/venues/enrichment'
+import type { RestaurantVenueInput } from '@/lib/venues/types'
 
 type RestaurantPlaceRow = {
-  google_place_id: string | null
-  id: number
-}
-
-type GoogleRefreshUpdate = {
+  cuisines: string[] | null
   formatted_address: string | null
-  google_editorial_summary: string | null
-  google_good_for_groups: boolean | null
-  google_good_for_watching_sports: boolean | null
+  google_business_status: string | null
+  google_last_synced_at: string | null
   google_live_music: boolean | null
   google_maps_uri: string | null
-  google_open_now: boolean | null
-  google_opening_hours: string[]
   google_outdoor_seating: boolean | null
-  google_phone_number: string | null
-  google_place_id: string
+  google_photo_refs: string[] | null
+  google_place_id: string | null
   google_price_level: string | null
+  google_primary_type: string | null
   google_rating: number | null
-  google_reservable: boolean | null
-  google_serves_beer: boolean | null
-  google_serves_brunch: boolean | null
-  google_serves_cocktails: boolean | null
-  google_serves_dessert: boolean | null
-  google_serves_dinner: boolean | null
-  google_serves_vegetarian_food: boolean | null
-  google_serves_wine: boolean | null
+  google_types: string[] | null
   google_user_ratings_total: number | null
   google_website_uri: string | null
+  id: number
+  name: string
+  neighbourhood: string | null
+  subregion: string
+  venue_crowd: string[] | null
+  venue_energy: string | null
+  venue_formats: string[] | null
+  venue_good_for_casual_meetups: boolean | null
+  venue_good_for_conversation: boolean | null
+  venue_group_friendly: boolean | null
+  venue_indoor_outdoor: string[] | null
   venue_latitude?: number
   venue_longitude?: number
-}
-
-type EventGoogleRefreshUpdate = Pick<
-  GoogleRefreshUpdate,
-  | 'google_good_for_groups'
-  | 'google_good_for_watching_sports'
-  | 'google_live_music'
-  | 'google_open_now'
-  | 'google_opening_hours'
-  | 'google_outdoor_seating'
-  | 'google_reservable'
-  | 'google_serves_beer'
-  | 'google_serves_brunch'
-  | 'google_serves_cocktails'
-  | 'google_serves_dessert'
-  | 'google_serves_dinner'
-  | 'google_serves_vegetarian_food'
-  | 'google_serves_wine'
-> & {
-  venue_latitude?: number
-  venue_longitude?: number
+  venue_noise_level: string | null
+  venue_price: string | null
+  venue_scene: string[] | null
+  venue_setting: string[] | null
+  venue_vibes: string[] | null
 }
 
 const REFRESH_LIMIT = 100
-
-function buildGoogleUpdate(
-  placeId: string,
-  details: Awaited<ReturnType<typeof getRestaurantPoiDetails>>
-): GoogleRefreshUpdate {
-  return {
-    formatted_address: details.formattedAddress,
-    google_editorial_summary: details.editorialSummary,
-    google_good_for_groups: details.goodForGroups,
-    google_good_for_watching_sports: details.goodForWatchingSports,
-    google_live_music: details.liveMusic,
-    google_maps_uri: details.googleMapsUri,
-    google_open_now: details.openNow,
-    google_opening_hours: details.openingHours,
-    google_outdoor_seating: details.outdoorSeating,
-    google_phone_number: details.phoneNumber,
-    google_place_id: details.id ?? placeId,
-    google_price_level: details.priceLevel,
-    google_rating: details.rating,
-    google_reservable: details.reservable,
-    google_serves_beer: details.servesBeer,
-    google_serves_brunch: details.servesBrunch,
-    google_serves_cocktails: details.servesCocktails,
-    google_serves_dessert: details.servesDessert,
-    google_serves_dinner: details.servesDinner,
-    google_serves_vegetarian_food: details.servesVegetarianFood,
-    google_serves_wine: details.servesWine,
-    google_user_ratings_total: details.userRatingCount,
-    google_website_uri: details.websiteUri,
-    ...(typeof details.latitude === 'number' ? { venue_latitude: details.latitude } : {}),
-    ...(typeof details.longitude === 'number' ? { venue_longitude: details.longitude } : {}),
-  }
-}
-
-function buildEventGoogleUpdate(update: GoogleRefreshUpdate): EventGoogleRefreshUpdate {
-  return {
-    google_good_for_groups: update.google_good_for_groups,
-    google_good_for_watching_sports: update.google_good_for_watching_sports,
-    google_live_music: update.google_live_music,
-    google_open_now: update.google_open_now,
-    google_opening_hours: update.google_opening_hours,
-    google_outdoor_seating: update.google_outdoor_seating,
-    google_reservable: update.google_reservable,
-    google_serves_beer: update.google_serves_beer,
-    google_serves_brunch: update.google_serves_brunch,
-    google_serves_cocktails: update.google_serves_cocktails,
-    google_serves_dessert: update.google_serves_dessert,
-    google_serves_dinner: update.google_serves_dinner,
-    google_serves_vegetarian_food: update.google_serves_vegetarian_food,
-    google_serves_wine: update.google_serves_wine,
-    ...(typeof update.venue_latitude === 'number'
-      ? { venue_latitude: update.venue_latitude }
-      : {}),
-    ...(typeof update.venue_longitude === 'number'
-      ? { venue_longitude: update.venue_longitude }
-      : {}),
-  }
-}
 
 async function refreshGooglePlaces(request: Request) {
   const auth = await requireAdminOrCron(request, {
@@ -132,7 +62,9 @@ async function refreshGooglePlaces(request: Request) {
     const adminClient = createServerSupabaseAdminClient()
     const { data: restaurants, error } = await adminClient
       .from('restaurants')
-      .select('google_place_id, id')
+      .select(
+        'cuisines, formatted_address, google_business_status, google_last_synced_at, google_live_music, google_maps_uri, google_outdoor_seating, google_photo_refs, google_place_id, google_price_level, google_primary_type, google_rating, google_types, google_user_ratings_total, google_website_uri, id, name, neighbourhood, subregion, venue_crowd, venue_energy, venue_formats, venue_good_for_casual_meetups, venue_good_for_conversation, venue_group_friendly, venue_indoor_outdoor, venue_latitude, venue_longitude, venue_noise_level, venue_price, venue_scene, venue_setting, venue_vibes'
+      )
       .is('archived_at', null)
       .not('google_place_id', 'is', null)
       .order('created_at', { ascending: true })
@@ -154,8 +86,8 @@ async function refreshGooglePlaces(request: Request) {
       }
 
       try {
-        const details = await getRestaurantPoiDetails(placeId)
-        const update = buildGoogleUpdate(placeId, details)
+        const enrichment = await fetchVenueEnrichment(placeId)
+        const update = buildRestaurantGoogleUpdate(enrichment)
 
         const { error: restaurantUpdateError } = await adminClient
           .from('restaurants')
@@ -166,15 +98,30 @@ async function refreshGooglePlaces(request: Request) {
           throw new Error(restaurantUpdateError.message)
         }
 
-        const { error: eventUpdateError } = await adminClient
-          .from('events')
-          .update(buildEventGoogleUpdate(update))
-          .eq('restaurant_id', restaurant.id)
-          .gte('starts_at', new Date().toISOString())
-          .neq('status', 'cancelled')
+        const derivedTraits = deriveVenueTraits({
+          ...(restaurant as RestaurantVenueInput),
+          google_business_status: enrichment.businessStatus,
+          google_maps_uri: enrichment.googleMapsUri,
+          google_photo_refs: enrichment.photoRefs,
+          google_place_id: enrichment.googlePlaceId,
+          google_price_level: enrichment.rawGooglePriceLevel,
+          google_primary_type: enrichment.primaryType,
+          google_rating: enrichment.googleRating,
+          google_types: enrichment.types,
+          google_user_ratings_total: enrichment.googleReviewCount,
+          google_website_uri: enrichment.websiteUri,
+          venue_latitude: enrichment.location?.lat ?? restaurant.venue_latitude ?? null,
+          venue_longitude: enrichment.location?.lng ?? restaurant.venue_longitude ?? null,
+        })
 
-        if (eventUpdateError) {
-          throw new Error(eventUpdateError.message)
+        const { error: traitsError } = await adminClient
+          .from('venue_traits')
+          .upsert(buildVenueTraitsUpsert(restaurant.id, derivedTraits), {
+            onConflict: 'restaurant_id',
+          })
+
+        if (traitsError) {
+          throw new Error(traitsError.message)
         }
 
         updated += 1

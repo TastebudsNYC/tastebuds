@@ -1,36 +1,34 @@
 'use client'
 
-/* eslint-disable @next/next/no-img-element */
-
 import { useEffect, useState } from 'react'
 
+import { VenuePhotoCarousel } from '@/components/app/VenuePhotoCarousel'
+import type { GooglePlacePhotoResult } from '@/lib/google-places'
+
 type GooglePlacePhotoResponse = {
-  photo?: {
-    authorName: string | null
-    photoUri: string | null
-  }
+  photos?: GooglePlacePhotoResult[]
 }
 
 export function GooglePlacePhoto({
   alt,
   attributionClassName,
+  enableCarousel = true,
   fallbackSrc,
   imageClassName,
   placeId,
 }: {
   alt: string
   attributionClassName?: string
+  enableCarousel?: boolean
   fallbackSrc: string
   imageClassName: string
   placeId?: string | null
 }) {
   const [photoState, setPhotoState] = useState<{
-    authorName: string | null
-    photoUri: string | null
+    photos: GooglePlacePhotoResult[]
     placeId: string | null
   }>({
-    authorName: null,
-    photoUri: null,
+    photos: [],
     placeId: null,
   })
   const normalizedPlaceId = placeId?.trim() || null
@@ -56,8 +54,7 @@ export function GooglePlacePhoto({
         }
 
         setPhotoState({
-          authorName: payload.photo?.authorName ?? null,
-          photoUri: payload.photo?.photoUri ?? null,
+          photos: payload.photos ?? [],
           placeId: currentPlaceId,
         })
       } catch {
@@ -74,25 +71,19 @@ export function GooglePlacePhoto({
     }
   }, [normalizedPlaceId])
 
-  const resolvedPhotoUri =
+  const resolvedPhotos =
     normalizedPlaceId && photoState.placeId === normalizedPlaceId
-      ? photoState.photoUri
-      : null
-  const resolvedAuthorName =
-    normalizedPlaceId && photoState.placeId === normalizedPlaceId
-      ? photoState.authorName
-      : null
+      ? photoState.photos
+      : []
 
   return (
-    <div className="relative h-full w-full">
-      <img
-        alt={alt}
-        className={imageClassName}
-        src={resolvedPhotoUri ?? fallbackSrc}
-      />
-      {resolvedAuthorName && attributionClassName ? (
-        <div className={attributionClassName}>Photo by {resolvedAuthorName}</div>
-      ) : null}
-    </div>
+    <VenuePhotoCarousel
+      alt={alt}
+      enableCarousel={enableCarousel}
+      fallbackSrc={fallbackSrc}
+      imageClassName={imageClassName}
+      photos={resolvedPhotos}
+      {...(attributionClassName ? { attributionClassName } : {})}
+    />
   )
 }

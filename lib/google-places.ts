@@ -1,6 +1,7 @@
 import 'server-only'
 
 type GoogleTextSearchPlace = {
+  businessStatus?: string
   displayName?: { text?: string }
   formattedAddress?: string
   goodForGroups?: boolean
@@ -12,6 +13,7 @@ type GoogleTextSearchPlace = {
   nationalPhoneNumber?: string
   outdoorSeating?: boolean
   priceLevel?: string
+  primaryType?: string
   rating?: number
   regularOpeningHours?: {
     openNow?: boolean
@@ -25,6 +27,7 @@ type GoogleTextSearchPlace = {
   servesDinner?: boolean
   servesVegetarianFood?: boolean
   servesWine?: boolean
+  types?: string[]
   userRatingCount?: number
   websiteUri?: string
 }
@@ -49,6 +52,11 @@ type GooglePlaceDetails = GoogleTextSearchPlace & {
 
 type GooglePlacePhotoMediaResponse = {
   photoUri?: string
+}
+
+export type GooglePlacePhotoResult = {
+  authorName: string | null
+  photoUri: string | null
 }
 
 function getGooglePlacesApiKey() {
@@ -124,7 +132,7 @@ export async function searchRestaurantPois(query: string) {
         textQuery: query,
       }),
       fieldMask:
-        'places.id,places.displayName,places.formattedAddress,places.goodForGroups,places.goodForWatchingSports,places.location,places.googleMapsUri,places.liveMusic,places.nationalPhoneNumber,places.outdoorSeating,places.priceLevel,places.rating,places.regularOpeningHours.openNow,places.reservable,places.servesBeer,places.servesBrunch,places.servesCocktails,places.servesDessert,places.servesDinner,places.servesVegetarianFood,places.servesWine,places.userRatingCount,places.websiteUri',
+        'places.businessStatus,places.id,places.displayName,places.formattedAddress,places.goodForGroups,places.goodForWatchingSports,places.location,places.googleMapsUri,places.liveMusic,places.nationalPhoneNumber,places.outdoorSeating,places.priceLevel,places.primaryType,places.rating,places.regularOpeningHours.openNow,places.reservable,places.servesBeer,places.servesBrunch,places.servesCocktails,places.servesDessert,places.servesDinner,places.servesVegetarianFood,places.servesWine,places.types,places.userRatingCount,places.websiteUri',
       method: 'POST',
     }
   )
@@ -164,12 +172,13 @@ export async function getRestaurantPoiDetails(placeId: string) {
     `https://places.googleapis.com/v1/places/${placeId}`,
     {
       fieldMask:
-        'id,displayName,editorialSummary,formattedAddress,goodForGroups,goodForWatchingSports,googleMapsUri,liveMusic,location,nationalPhoneNumber,outdoorSeating,priceLevel,rating,regularOpeningHours.openNow,regularOpeningHours.weekdayDescriptions,reservable,servesBeer,servesBrunch,servesCocktails,servesDessert,servesDinner,servesVegetarianFood,servesWine,userRatingCount,websiteUri',
+        'id,displayName,editorialSummary,formattedAddress,businessStatus,goodForGroups,goodForWatchingSports,googleMapsUri,liveMusic,location,nationalPhoneNumber,outdoorSeating,photos.name,priceLevel,primaryType,rating,regularOpeningHours.openNow,regularOpeningHours.weekdayDescriptions,reservable,servesBeer,servesBrunch,servesCocktails,servesDessert,servesDinner,servesVegetarianFood,servesWine,types,userRatingCount,websiteUri',
       method: 'GET',
     }
   )
 
   return {
+    businessStatus: payload.businessStatus ?? null,
     editorialSummary: payload.editorialSummary?.text ?? null,
     formattedAddress: payload.formattedAddress ?? null,
     goodForGroups: payload.goodForGroups ?? null,
@@ -184,7 +193,9 @@ export async function getRestaurantPoiDetails(placeId: string) {
     openingHours: payload.regularOpeningHours?.weekdayDescriptions ?? [],
     outdoorSeating: payload.outdoorSeating ?? null,
     phoneNumber: payload.nationalPhoneNumber ?? null,
+    photoRefs: (payload.photos ?? []).map((photo) => photo.name).filter((value): value is string => Boolean(value)),
     priceLevel: payload.priceLevel ?? null,
+    primaryType: payload.primaryType ?? null,
     rating: payload.rating ?? null,
     reservable: payload.reservable ?? null,
     servesBeer: payload.servesBeer ?? null,
@@ -194,12 +205,17 @@ export async function getRestaurantPoiDetails(placeId: string) {
     servesDinner: payload.servesDinner ?? null,
     servesVegetarianFood: payload.servesVegetarianFood ?? null,
     servesWine: payload.servesWine ?? null,
+    types: payload.types ?? [],
     userRatingCount: payload.userRatingCount ?? null,
     websiteUri: payload.websiteUri ?? null,
   }
 }
 
-export async function getRestaurantPlacePhoto(placeId: string, maxWidthPx = 1200) {
+export async function getRestaurantPlacePhotos(
+  placeId: string,
+  maxWidthPx = 1200,
+  maxPhotos = 5
+) {
   const placePayload = await googlePlacesFetch<GooglePlaceDetails>(
     `https://places.googleapis.com/v1/places/${placeId}`,
     {
@@ -208,41 +224,56 @@ export async function getRestaurantPlacePhoto(placeId: string, maxWidthPx = 1200
     }
   )
 
-  const firstPhoto = placePayload.photos?.[0]
-  const photoName = firstPhoto?.name
+  const photos = await Promise.all(
+    (placePayload.photos ?? []).slice(0, maxPhotos).map(async (photo) => {
+      if (!photo.name) {
+        return null
+      }
 
-  if (!photoName) {
-    return {
+      const mediaPayload = await googlePlacesFetch<GooglePlacePhotoMediaResponse>(
+        `https://places.googleapis.com/v1/${photo.name}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`,
+        {
+          fieldMask: 'photoUri',
+          method: 'GET',
+        }
+      )
+
+      return {
+        authorName:
+          photo.authorAttributions?.find((entry) => entry.displayName?.trim())?.displayName ??
+          null,
+        photoUri: mediaPayload.photoUri ?? null,
+      } satisfies GooglePlacePhotoResult
+    })
+  )
+
+  return photos.filter(
+    (photo): photo is GooglePlacePhotoResult => Boolean(photo?.photoUri)
+  )
+}
+
+export async function getRestaurantPlacePhoto(placeId: string, maxWidthPx = 1200) {
+  const photos = await getRestaurantPlacePhotos(placeId, maxWidthPx, 1)
+
+  return (
+    photos[0] ?? {
       authorName: null,
       photoUri: null,
     }
-  }
-
-  const mediaPayload = await googlePlacesFetch<GooglePlacePhotoMediaResponse>(
-    `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`,
-    {
-      fieldMask: 'photoUri',
-      method: 'GET',
-    }
   )
-
-  return {
-    authorName:
-      firstPhoto?.authorAttributions?.find((entry) => entry.displayName?.trim())
-        ?.displayName ?? null,
-    photoUri: mediaPayload.photoUri ?? null,
-  }
 }
 
 export async function getRestaurantGoogleDetails(placeId: string) {
-  const [details, photo] = await Promise.all([
+  const [details, photos] = await Promise.all([
     getRestaurantPoiDetails(placeId),
-    getRestaurantPlacePhoto(placeId, 1400),
+    getRestaurantPlacePhotos(placeId, 1400, 6),
   ])
+  const primaryPhoto = photos[0] ?? { authorName: null, photoUri: null }
 
   return {
     ...details,
-    photoAuthorName: photo.authorName,
-    photoUri: photo.photoUri,
+    photoAuthorName: primaryPhoto.authorName,
+    photoUri: primaryPhoto.photoUri,
+    photos,
   }
 }

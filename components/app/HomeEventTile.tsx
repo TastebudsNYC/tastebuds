@@ -19,14 +19,14 @@ function getEventImage(index: number) {
 
 function getEventLabel(event: DashboardEvent) {
   if (event.signupStatus === 'going') {
-    return 'Your table'
+    return 'Joined'
   }
 
   if (event.spotsLeft === 0) {
     return 'Table full'
   }
 
-  return 'Meetup'
+  return 'Open table'
 }
 
 function getEventDateBadge(value: string) {
@@ -89,8 +89,8 @@ export function HomeEventTile({
 
   return (
     <Link
-      className="group overflow-hidden rounded-2xl border border-[#ece7dc] bg-white shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)]"
-      href={`/events/${event.id}`}
+      className="group overflow-hidden rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_10px_40px_-10px_rgba(113,92,0,0.08)]"
+      href="/events"
     >
       <div className="relative h-44 overflow-hidden">
         <GooglePlacePhoto
@@ -100,7 +100,7 @@ export function HomeEventTile({
           placeId={event.restaurantGooglePlaceId}
         />
         <div className="absolute left-4 top-4 rounded-lg bg-white/90 px-3 py-2 text-center backdrop-blur">
-          <span className="block text-xl font-bold leading-none text-[#1a1c1b]">{badge.day}</span>
+          <span className="block text-xl font-bold leading-none text-[color:var(--foreground)]">{badge.day}</span>
           <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-strong)]">
             {badge.month}
           </span>
@@ -109,12 +109,12 @@ export function HomeEventTile({
       <div className="p-4">
         <div className="flex flex-wrap items-center gap-2">
           <MatchScoreBadge compact score={event.projectedRestaurantScore} />
-          <span className="inline-flex items-center rounded-full bg-[#ffe8ef] px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-[#ab2c5d]">
+          <span className="inline-flex items-center rounded-full bg-[color:var(--status-bg)] px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-[color:var(--status-text)]">
             {getEventLabel(event)}
           </span>
         </div>
-        <h4 className="mt-2 text-xl font-semibold leading-6 text-[#1a1c1b]">{event.title}</h4>
-        <div className="mt-3 flex items-center gap-1 text-sm text-[#6c6558]">
+        <h4 className="mt-2 text-xl font-semibold leading-6 text-[color:var(--foreground)]">{event.title}</h4>
+        <div className="mt-3 flex items-center gap-1 text-sm text-[color:var(--text-secondary)]">
           <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
             <path
               d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
@@ -126,20 +126,20 @@ export function HomeEventTile({
           </svg>
           <span>{formatEventWindow(event)}</span>
         </div>
-        <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#6c6558]">
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-[color:var(--text-secondary)]">
           {event.personalMatchSummary ?? event.venueMatchSummary}
         </p>
         <div className="mt-4 flex -space-x-2">
           {attendees.preview.map((chip, chipIndex) => (
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#bee9ff] text-[10px] font-bold text-[#004d65]"
+              className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[color:var(--surface-soft)] text-[10px] font-bold text-[color:var(--status-text)]"
               key={`${event.id}-${chip}-${chipIndex}`}
             >
               {chip}
             </div>
           ))}
           {attendees.remaining > 0 ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#84d7fd] text-[10px] font-bold text-[#005d79]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[color:var(--accent-soft)] text-[10px] font-bold text-[color:var(--accent-strong)]">
               +{attendees.remaining}
             </div>
           ) : null}
