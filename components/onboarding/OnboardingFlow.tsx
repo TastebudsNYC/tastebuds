@@ -131,73 +131,89 @@ const PROFILE_STAGE_SEQUENCE: StageId[] = [
 ]
 
 function StageShell({
-  backLabel,
   children,
   currentStep,
-  showLoginLink = true,
-  onBack,
+  footer,
   progressTotal,
+  showLoginLink = true,
+  stageId,
 }: {
-  backLabel?: string
   children: React.ReactNode
   currentStep: number
-  showLoginLink?: boolean
-  onBack?: () => void
+  footer: React.ReactNode
   progressTotal: number
+  showLoginLink?: boolean
+  stageId: StageId | 'loading'
 }) {
   const progress = progressTotal <= 1 ? 1 : currentStep / progressTotal
+  const stageAccent = getStageAccentClass(stageId)
+  const stagePanelCopy = getStagePanelCopy(stageId)
 
   return (
-    <main className="min-h-screen bg-[color:var(--background)] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-6xl flex-col gap-6 lg:min-h-[calc(100vh-4rem)]">
-        <header className="flex items-center justify-between gap-4 rounded-[2rem] border border-[color:var(--nav-border)] bg-[color:var(--nav-bg)] px-5 py-4 text-white shadow-[0_18px_42px_rgba(0,20,38,0.18)]">
-          <TastebudsLogo showTagline size="sm" theme="dark" />
-          <div className="min-w-[160px]">
-            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f8dfba]">
-              <span>Setup</span>
-              <span>
-                {currentStep}
-                {' '}
-                /
-                {' '}
-                {progressTotal}
-              </span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-[color:var(--accent)] transition-[width] duration-300 ease-out"
-                style={{ width: `${Math.max(progress, 0.06) * 100}%` }}
-              />
+    <main className={`tb-onboarding-shell ${stageAccent}`}>
+      <div className="tb-onboarding-backdrop" />
+      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+        <header className="tb-onboarding-header">
+          <TastebudsLogo showTagline={false} size="sm" theme="dark" />
+          <div className="flex min-w-[180px] flex-col items-end gap-2">
+            {showLoginLink ? (
+              <Link
+                className="text-sm font-semibold text-white/68 transition hover:text-white"
+                href="/login"
+              >
+                Log in
+              </Link>
+            ) : (
+              <span className="h-5" />
+            )}
+            <div className="w-full">
+              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f8dfba]">
+                <span>Setup</span>
+                <span>
+                  {currentStep}
+                  {' '}
+                  /
+                  {' '}
+                  {progressTotal}
+                </span>
+              </div>
+              <div className="mt-2 h-px overflow-hidden bg-white/12">
+                <div
+                  className="h-full bg-[color:var(--accent)] transition-[width] duration-500 ease-out"
+                  style={{ width: `${Math.max(progress, 0.06) * 100}%` }}
+                />
+              </div>
             </div>
           </div>
         </header>
 
-        <section className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-[760px] rounded-[2rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-6 shadow-[0_24px_56px_rgba(0,20,38,0.08)] sm:p-8 lg:p-10">
-            <div className="mb-8 flex items-center justify-between gap-4">
-              {onBack ? (
-                <button
-                  className="text-sm font-semibold text-[color:var(--text-secondary)] transition hover:text-[color:var(--foreground)]"
-                  onClick={onBack}
-                  type="button"
-                >
-                  ← {backLabel ?? 'Back'}
-                </button>
-              ) : (
-                <span />
-              )}
-              {showLoginLink ? (
-                <Link
-                  className="text-sm font-semibold text-[color:var(--text-secondary)] transition hover:text-[color:var(--foreground)]"
-                  href="/login"
-                >
-                  Log in
-                </Link>
-              ) : (
-                <span />
-              )}
+        <section className="flex flex-1 py-4 lg:py-6">
+          <div className="tb-onboarding-frame">
+            <div className="tb-onboarding-rail">
+              <div className="relative z-10 max-w-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f4d08a]">
+                  Tastebuds setup
+                </p>
+                <h2 className="mt-5 text-[2.4rem] font-bold leading-[0.95] tracking-[-0.06em] text-white sm:text-[3rem]">
+                  {stagePanelCopy.title}
+                </h2>
+                <p className="mt-5 text-base leading-7 text-white/68">
+                  {stagePanelCopy.copy}
+                </p>
+              </div>
+              <div className="tb-onboarding-rail-glow" />
             </div>
-            {children}
+
+            <div className="tb-onboarding-content-pane">
+              <div className="tb-onboarding-step" key={stageId}>
+                <div className="tb-onboarding-content">
+                  {children}
+                </div>
+                <footer className="tb-onboarding-footer">
+                  {footer}
+                </footer>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -215,16 +231,16 @@ function StageHeading({
   subtext: string
 }) {
   return (
-    <div>
+    <div className="space-y-4 text-center lg:text-left">
       {eyebrow ? (
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--accent-strong)]">
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="mt-3 text-[2.35rem] font-bold leading-[0.96] tracking-[-0.05em] text-[color:var(--foreground)] sm:text-[3rem]">
+      <h1 className="text-[2.85rem] font-bold leading-[0.92] tracking-[-0.07em] text-[color:var(--foreground)] sm:text-[3.5rem] lg:text-[4.25rem]">
         {heading}
       </h1>
-      <p className="mt-4 max-w-[36rem] text-base leading-7 text-[color:var(--text-secondary)]">
+      <p className="mx-auto max-w-[44rem] text-lg leading-8 text-[color:var(--text-secondary)] lg:mx-0">
         {subtext}
       </p>
     </div>
@@ -244,8 +260,8 @@ function ChoiceChip({
     <button
       className={
         active
-          ? 'rounded-[1.25rem] border border-[color:var(--accent)] bg-[color:var(--accent)] px-4 py-3 text-sm font-semibold text-[color:var(--accent-text)] shadow-[0_10px_20px_rgba(245,158,11,0.28)] transition'
-          : 'rounded-[1.25rem] border border-[color:var(--border-soft)] bg-white px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-soft)]'
+          ? 'min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--accent)] bg-[color:var(--accent)] px-5 py-4 text-left text-base font-semibold text-[color:var(--accent-text)] shadow-[0_16px_30px_rgba(245,158,11,0.24)] transition'
+          : 'min-h-[5.5rem] rounded-[1.6rem] border border-[color:var(--border-soft)] bg-white px-5 py-4 text-left text-base font-medium text-[color:var(--foreground)] transition hover:border-[color:var(--accent-border)] hover:bg-[color:var(--surface-soft)]'
       }
       onClick={onClick}
       type="button"
@@ -267,9 +283,11 @@ function ChoiceGroup({
   selected: string[]
 }) {
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-semibold text-[color:var(--foreground)]">{label}</p>
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-4">
+      <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--text-secondary)]">
+        {label}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {options.map((option) => (
           <ChoiceChip
             active={selected.includes(option)}
@@ -282,6 +300,94 @@ function ChoiceGroup({
       </div>
     </div>
   )
+}
+
+function getStageAccentClass(stage: StageId | 'loading') {
+  if (stage.startsWith('welcome') || stage === 'loading') {
+    return 'tb-onboarding-theme-welcome'
+  }
+
+  if (stage.startsWith('account')) {
+    return 'tb-onboarding-theme-account'
+  }
+
+  if (stage === 'restaurants' || stage === 'finish') {
+    return 'tb-onboarding-theme-activation'
+  }
+
+  return 'tb-onboarding-theme-profile'
+}
+
+function getStagePanelCopy(stage: StageId | 'loading') {
+  if (stage === 'loading') {
+    return {
+      copy: 'Restoring your account and the next onboarding step.',
+      title: 'Getting your setup ready',
+    }
+  }
+
+  if (stage.startsWith('welcome')) {
+    return {
+      copy: 'A guided setup that stays focused on the kind of night, table and people you would actually say yes to.',
+      title: 'Build your first Tastebuds night',
+    }
+  }
+
+  if (stage.startsWith('account')) {
+    return {
+      copy: 'Create the account that keeps your profile, saved places and live table plans in sync.',
+      title: 'Create your Tastebuds account',
+    }
+  }
+
+  if (stage === 'home-area' || stage === 'preferred-area' || stage === 'travel') {
+    return {
+      copy: 'Keep the suggestions realistic by telling us where you start and how far a good plan can pull you.',
+      title: 'Set the ground rules',
+    }
+  }
+
+  if (
+    stage === 'price' ||
+    stage === 'cuisines' ||
+    stage === 'dietary' ||
+    stage === 'drinks'
+  ) {
+    return {
+      copy: 'Tell Tastebuds what you would genuinely book, not the theoretical version of your perfect night out.',
+      title: 'Shape the table around taste',
+    }
+  }
+
+  if (
+    stage === 'energy-scene' ||
+    stage === 'music-setting' ||
+    stage === 'vibes'
+  ) {
+    return {
+      copy: 'The room matters. Energy, setting and mood are what make the same restaurant feel right or wrong.',
+      title: 'Dial in the vibe',
+    }
+  }
+
+  if (stage === 'crowd-conversation' || stage === 'group-age') {
+    return {
+      copy: 'A good night is about more than the venue. Set the sort of table dynamic that feels easy to join.',
+      title: 'Set the social feel',
+    }
+  }
+
+  if (stage === 'restaurants') {
+    return {
+      copy: 'Start from real places you would book so the dashboard has immediate shape after setup.',
+      title: 'Save a few real starting points',
+    }
+  }
+
+  return {
+    copy: 'You are one step away from a profile that actually reflects how you like to go out.',
+    title: 'Almost there',
+  }
 }
 
 function formatRestaurantMeta(restaurant: DashboardRestaurant) {
@@ -708,7 +814,13 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
 
   if (!sessionChecked) {
     return (
-      <StageShell currentStep={1} progressTotal={visibleStages.length} showLoginLink={!authenticated}>
+      <StageShell
+        currentStep={1}
+        footer={<div />}
+        progressTotal={visibleStages.length}
+        showLoginLink={!authenticated}
+        stageId="loading"
+      >
         <StageHeading
           heading="Preparing your setup"
           subtext="Loading your account and profile so you can carry on where you left off."
@@ -726,14 +838,96 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
       ? `${savedRestaurantCount} saved`
       : 'Save 2 to continue'
     : `${savedRestaurantCount} saved`
+  const inputClassName =
+    'tb-input min-h-[4.35rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/92 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.04)]'
+  const canContinueFromFooter =
+    stage === 'drinks'
+      ? true
+      : stage === 'account-email'
+        ? email.trim().length > 0
+        : !disableContinue
+
+  const footer = (
+    <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex items-center gap-3">
+        {canGoBack ? (
+          <Button className="min-w-32" onClick={goBack} variant="secondary">
+            Back
+          </Button>
+        ) : (
+          <span />
+        )}
+        {stage === 'bio' ? (
+          <Button onClick={() => continueTo()} variant="ghost">
+            Skip for now
+          </Button>
+        ) : null}
+        {stage === 'restaurants' ? (
+          <Button onClick={handleActivationContinue} variant="ghost">
+            Skip for now
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-stretch gap-3 lg:items-end">
+        {stage === 'account-email' ? (
+          <Link
+            className="text-sm font-semibold text-[color:var(--text-secondary)] underline underline-offset-2"
+            href="/login"
+          >
+            Already have an account? Log in
+          </Link>
+        ) : null}
+
+        {stage === 'finish' ? (
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button href="/profile" variant="secondary">
+              Edit full profile
+            </Button>
+            <Button className="min-w-44" href="/dashboard">
+              See my dashboard
+            </Button>
+          </div>
+        ) : stage === 'account-password' ? (
+          <Button className="min-w-44" disabled={loading} onClick={() => void handleCreateAccount()}>
+            {loading ? 'Creating account...' : 'Create account'}
+          </Button>
+        ) : stage === 'group-age' ? (
+          <Button className="min-w-44" disabled={loading || disableContinue} onClick={() => void handleFinishSetup()}>
+            {loading ? 'Saving profile...' : 'Continue'}
+          </Button>
+        ) : stage === 'restaurants' ? (
+          <Button
+            className="min-w-44"
+            disabled={restaurantSelectionRequired && savedRestaurantCount < 2}
+            onClick={handleActivationContinue}
+          >
+            Continue
+          </Button>
+        ) : (
+          <Button
+            className="min-w-40"
+            disabled={!canContinueFromFooter}
+            onClick={() => continueTo()}
+          >
+            {stage === 'welcome-1' || stage === 'welcome-2'
+              ? 'Next'
+              : stage === 'welcome-3'
+                ? 'Create my profile'
+                : 'Continue'}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <StageShell
-      backLabel={stage === 'account-password' ? 'Back' : 'Previous'}
       currentStep={currentStep}
+      footer={footer}
       progressTotal={visibleStages.length}
       showLoginLink={!authenticated}
-      {...(canGoBack ? { onBack: goBack } : {})}
+      stageId={stage}
     >
       {stage === 'welcome-1' ? (
         <div className="space-y-8">
@@ -742,9 +936,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Meet people through places"
             subtext="Tastebuds helps you find people who want the same kind of night out."
           />
-          <Button className="min-w-36" onClick={() => continueTo()}>
-            Next
-          </Button>
         </div>
       ) : null}
 
@@ -755,9 +946,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Pick your vibe"
             subtext="Cosy dinner, cocktails, casual bite, big group energy — tell us what actually sounds good."
           />
-          <Button className="min-w-36" onClick={() => continueTo()}>
-            Next
-          </Button>
         </div>
       ) : null}
 
@@ -768,9 +956,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Get matched for real plans"
             subtext="We suggest people, places and times that fit how you like to go out."
           />
-          <Button className="min-w-44" onClick={() => continueTo()}>
-            Create my profile
-          </Button>
         </div>
       ) : null}
 
@@ -781,32 +966,17 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="What’s your email?"
             subtext="We’ll use this to create your Tastebuds account."
           />
-          <label className="block space-y-2">
+          <label className="block space-y-3">
             <span className="text-sm font-medium text-[color:var(--foreground)]">Email</span>
             <input
               autoComplete="email"
-              className="tb-input"
+              className={inputClassName}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
               type="email"
               value={email}
             />
           </label>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              className="min-w-36"
-              disabled={!email.trim()}
-              onClick={() => continueTo()}
-            >
-              Continue
-            </Button>
-            <Link
-              className="text-sm font-semibold text-[color:var(--text-secondary)] underline"
-              href="/login"
-            >
-              Already have an account? Log in
-            </Link>
-          </div>
         </div>
       ) : null}
 
@@ -817,12 +987,12 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Create a password"
             subtext="Keep it secure. You’ll use this to log back in."
           />
-          <div className="space-y-4">
-            <label className="block space-y-2">
+          <div className="space-y-5">
+            <label className="block space-y-3">
               <span className="text-sm font-medium text-[color:var(--foreground)]">Password</span>
               <input
                 autoComplete="new-password"
-                className="tb-input"
+                className={inputClassName}
                 minLength={6}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="At least 6 characters"
@@ -830,13 +1000,13 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
                 value={password}
               />
             </label>
-            <label className="block space-y-2">
+            <label className="block space-y-3">
               <span className="text-sm font-medium text-[color:var(--foreground)]">
                 Confirm password
               </span>
               <input
                 autoComplete="new-password"
-                className="tb-input"
+                className={inputClassName}
                 minLength={6}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder="Re-enter password"
@@ -844,14 +1014,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
                 value={confirmPassword}
               />
             </label>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button className="min-w-40" disabled={loading} onClick={() => void handleCreateAccount()}>
-              {loading ? 'Creating account...' : 'Create account'}
-            </Button>
-            <Button onClick={goBack} variant="secondary">
-              Back
-            </Button>
           </div>
         </div>
       ) : null}
@@ -863,11 +1025,11 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="What should people call you?"
             subtext="This is the name people will see when you’re matched."
           />
-          <label className="block space-y-2">
+          <label className="block space-y-3">
             <span className="text-sm font-medium text-[color:var(--foreground)]">Display name</span>
             <input
               autoComplete="name"
-              className="tb-input"
+              className={inputClassName}
               onChange={(event) =>
                 setDraft((current) => ({ ...current, displayName: event.target.value }))
               }
@@ -875,9 +1037,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               value={draft.displayName}
             />
           </label>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -888,25 +1047,17 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Describe your ideal night out"
             subtext="One quick line to help people get your vibe."
           />
-          <label className="block space-y-2">
+          <label className="block space-y-3">
             <span className="text-sm font-medium text-[color:var(--foreground)]">
               Quick line about your ideal night
             </span>
             <textarea
-              className="tb-input min-h-28 rounded-[1.5rem]"
+              className="tb-input min-h-44 rounded-[1.8rem] px-5 py-5 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.04)]"
               onChange={(event) => setDraft((current) => ({ ...current, bio: event.target.value }))}
               placeholder="Cosy table, good food, easy conversation."
               value={draft.bio}
             />
           </label>
-          <div className="flex flex-wrap gap-3">
-            <Button className="min-w-36" onClick={() => continueTo()}>
-              Continue
-            </Button>
-            <Button onClick={() => continueTo()} variant="secondary">
-              Skip for now
-            </Button>
-          </div>
         </div>
       ) : null}
 
@@ -941,9 +1092,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               }))
             }
           />
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -965,9 +1113,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             options={SUBREGIONS}
             selected={[draft.subregion]}
           />
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -991,9 +1136,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               </ChoiceChip>
             ))}
           </div>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1015,9 +1157,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             options={PRICE_TAGS}
             selected={draft.preferredPrice}
           />
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1028,12 +1167,12 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="What food are you actually up for?"
             subtext="Add cuisines you’d genuinely be happy to book."
           />
-          <label className="block space-y-2">
+          <label className="block space-y-3">
             <span className="text-sm font-medium text-[color:var(--foreground)]">
               Preferred cuisines
             </span>
             <input
-              className="tb-input"
+              className={inputClassName}
               onChange={(event) =>
                 setDraft((current) => ({ ...current, cuisinePreferences: event.target.value }))
               }
@@ -1041,9 +1180,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               value={draft.cuisinePreferences}
             />
           </label>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1068,9 +1204,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             options={DIETARY_RESTRICTION_TAGS}
             selected={draft.dietaryRestrictions}
           />
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1092,9 +1225,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             options={DRINKING_PREFERENCE_TAGS}
             selected={draft.drinkingPreferences}
           />
-          <Button className="min-w-36" onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1129,9 +1259,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               selected={draft.preferredScene}
             />
           </div>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1166,9 +1293,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               selected={draft.preferredSetting}
             />
           </div>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1190,9 +1314,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             options={VIBE_TAGS}
             selected={draft.preferredVibes}
           />
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1230,9 +1351,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               selected={draft.conversationPreference}
             />
           </div>
-          <Button className="min-w-36" disabled={disableContinue} onClick={() => continueTo()}>
-            Continue
-          </Button>
         </div>
       ) : null}
 
@@ -1267,9 +1385,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
               selected={draft.ageRangeComfort}
             />
           </div>
-          <Button className="min-w-40" disabled={loading || disableContinue} onClick={() => void handleFinishSetup()}>
-            {loading ? 'Saving profile...' : 'Continue'}
-          </Button>
         </div>
       ) : null}
 
@@ -1403,21 +1518,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3">
-            <Button
-              className="min-w-40"
-              disabled={restaurantSelectionRequired && savedRestaurantCount < 2}
-              onClick={handleActivationContinue}
-            >
-              Continue
-            </Button>
-            <Button onClick={handleActivationContinue} variant="secondary">
-              Skip for now
-            </Button>
-            <Button onClick={goBack} variant="secondary">
-              Back
-            </Button>
-          </div>
         </div>
       ) : null}
 
@@ -1428,14 +1528,6 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
             heading="Your Tastebuds profile is ready"
             subtext="You’ve set your vibe and saved a few places to start from."
           />
-          <div className="flex flex-wrap gap-3">
-            <Button className="min-w-44" href="/dashboard">
-              See my dashboard
-            </Button>
-            <Button href="/profile" variant="secondary">
-              Edit full profile
-            </Button>
-          </div>
         </div>
       ) : null}
 
