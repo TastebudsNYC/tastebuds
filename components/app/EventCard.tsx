@@ -394,7 +394,7 @@ export function EventCard({
   return (
     <article
       className={`group overflow-hidden rounded-xl border bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.07)] ${
-        event.hasEnded ? 'border-[color:var(--accent-border)] opacity-90' : 'border-[color:var(--border-soft)]'
+        event.hasEnded ? 'border-[color:var(--accent-border)]' : 'border-[color:var(--border-soft)]'
       } ${highlighted ? 'border-[color:var(--accent-border)] shadow-[0_22px_50px_rgba(255,193,67,0.18)]' : ''} ${showDetails ? '' : 'tb-card-interactive'}`}
       onMouseEnter={() => onHighlightChange?.(event.id)}
       onMouseLeave={() => onHighlightChange?.(null)}
