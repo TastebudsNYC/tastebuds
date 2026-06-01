@@ -1,16 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { AnimatedNumber } from '@/components/app/AnimatedNumber'
 import { ProfileAvatar } from '@/components/app/ProfileAvatar'
 import { TastebudsLogo } from '@/components/TastebudsLogo'
-import {
-  cx,
-  formatLiveTableCount,
-  formatWatchingVenueCount,
-} from '@/lib/app/format'
+import { cx } from '@/lib/app/format'
 import type { Profile } from '@/lib/app/types'
 
 const NAV_ITEMS = [
@@ -31,66 +26,21 @@ function getShortName(profile: Profile | null | undefined) {
   return getDisplayName(profile).split(/\s+/)[0] ?? 'Profile'
 }
 
-function getStatusLabel({
-  liveTableCount,
-  savedVenueCount,
-}: {
-  liveTableCount: number | undefined
-  savedVenueCount: number | undefined
-}) {
-  if ((liveTableCount ?? 0) > 0) {
-    return formatLiveTableCount(liveTableCount ?? 0)
-  }
-
-  if ((savedVenueCount ?? 0) > 0) {
-    return formatWatchingVenueCount(savedVenueCount ?? 0)
-  }
-
-  return null
-}
-
-function getStatusCount(statusLabel: string | null) {
-  if (!statusLabel) {
-    return null
-  }
-
-  const [countText, ...rest] = statusLabel.split(' ')
-  const count = Number(countText)
-
-  if (Number.isNaN(count) || rest.length === 0) {
-    return null
-  }
-
-  return {
-    count,
-    suffix: rest.join(' '),
-  }
-}
-
 export function TopNav({
   currentPath,
-  liveTableCount,
   onLogout,
   profile,
-  savedVenueCount,
   unreadCount = 0,
   wide = false,
 }: {
   currentPath: string
-  liveTableCount?: number
   onLogout?: () => void
   profile?: Profile | null
-  savedVenueCount?: number
   unreadCount?: number
   wide?: boolean
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const statusLabel = useMemo(
-    () => getStatusLabel({ liveTableCount, savedVenueCount }),
-    [liveTableCount, savedVenueCount]
-  )
-  const statusParts = useMemo(() => getStatusCount(statusLabel), [statusLabel])
   const displayName = getDisplayName(profile)
   const shortName = getShortName(profile)
 
@@ -174,21 +124,6 @@ export function TopNav({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {statusLabel ? (
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-[#d8e2ec] lg:inline-flex">
-              <span className="h-2 w-2 rounded-full bg-[color:var(--accent)]" />
-              <span>
-                {statusParts ? (
-                  <>
-                    <AnimatedNumber value={statusParts.count} /> {statusParts.suffix}
-                  </>
-                ) : (
-                  statusLabel
-                )}
-              </span>
-            </div>
-          ) : null}
-
           {onLogout ? (
             <div className="relative" ref={menuRef}>
               <button

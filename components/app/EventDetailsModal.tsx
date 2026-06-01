@@ -30,7 +30,7 @@ export function EventDetailsModal({
   similarEvents?: DashboardEvent[]
 }) {
   return (
-    <ModalShell className="max-w-6xl" onClose={onClose}>
+    <ModalShell className="max-w-6xl" initialFocus="container" onClose={onClose}>
       {({ requestClose }) => (
         <EventCard
           event={event}

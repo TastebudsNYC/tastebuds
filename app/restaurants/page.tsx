@@ -564,10 +564,6 @@ export default function RestaurantsPage() {
     () => restaurants.filter((restaurant) => restaurant.isSaved).slice(0, 3),
     [restaurants]
   )
-  const savedVenueCount = useMemo(
-    () => restaurants.filter((restaurant) => restaurant.isSaved).length,
-    [restaurants]
-  )
   const unreadNotificationCount = useMemo(
     () => notifications.filter((notification) => !notification.read_at).length,
     [notifications]
@@ -583,14 +579,6 @@ export default function RestaurantsPage() {
   const liveVisibleCount = useMemo(
     () => visibleRestaurants.filter((restaurant) => restaurant.availableEventCount > 0).length,
     [visibleRestaurants]
-  )
-  const liveTableCount = useMemo(
-    () =>
-      restaurants.reduce(
-        (total, restaurant) => total + Math.max(0, restaurant.availableEventCount),
-        0
-      ),
-    [restaurants]
   )
   const mapRestaurants = useMemo(
     () =>
@@ -633,10 +621,8 @@ export default function RestaurantsPage() {
   return (
     <AppShell
       currentPath="/restaurants"
-      liveTableCount={liveTableCount}
       onLogout={handleLogout}
       profile={profile}
-      savedVenueCount={savedVenueCount}
       unreadCount={unreadNotificationCount}
       wide
     >

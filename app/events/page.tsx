@@ -466,11 +466,7 @@ export default function EventsPage() {
 
     return allRestaurants.filter((restaurant) => restaurantIds.has(restaurant.id))
   }, [allRestaurants, groupedEvents.active])
-  const savedVenueCount = allRestaurants.filter((restaurant) => restaurant.isSaved).length
   const unreadNotificationCount = notifications.filter((notification) => !notification.read_at).length
-  const liveTableCount = visibleEvents.filter(
-    (event) => event.status === 'open' && event.spotsLeft > 0 && !event.hasEnded
-  ).length
   const similarEvents = selectedEvent ? getSimilarEvents(visibleEvents, selectedEvent) : []
 
   function handleSelectRestaurantFromMap(restaurantId: number | null) {
@@ -498,10 +494,8 @@ export default function EventsPage() {
   return (
     <AppShell
       currentPath="/events"
-      liveTableCount={liveTableCount}
       onLogout={handleLogout}
       profile={profile}
-      savedVenueCount={savedVenueCount}
       unreadCount={unreadNotificationCount}
       wide
     >

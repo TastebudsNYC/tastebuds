@@ -10,30 +10,24 @@ import { TopNav } from '@/components/app/TopNav'
 export function AppShell({
   children,
   currentPath,
-  liveTableCount,
   onLogout,
   profile,
-  savedVenueCount,
   showFooter = false,
   unreadCount = 0,
   wide = false,
 }: {
   children: ReactNode
   currentPath: string
-  liveTableCount?: number
   onLogout?: () => void
   profile?: Profile | null
-  savedVenueCount?: number
   showFooter?: boolean
   unreadCount?: number
   wide?: boolean
 }) {
   const topNavProps = {
     currentPath,
-    ...(liveTableCount !== undefined ? { liveTableCount } : {}),
     ...(onLogout ? { onLogout } : {}),
     ...(profile !== undefined ? { profile } : {}),
-    ...(savedVenueCount !== undefined ? { savedVenueCount } : {}),
     ...(unreadCount !== undefined ? { unreadCount } : {}),
     ...(wide ? { wide } : {}),
   }

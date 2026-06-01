@@ -254,7 +254,6 @@ export default function DashboardPage() {
       ? { lat: profile.home_latitude, lng: profile.home_longitude }
       : null
   const unreadNotificationCount = notifications.filter((item) => !item.read_at).length
-  const savedVenueCount = restaurants.filter((restaurant) => restaurant.isSaved).length
   const activeRestaurantId =
     selectedRestaurantId && allSavedRestaurants.some((restaurant) => restaurant.id === selectedRestaurantId)
       ? selectedRestaurantId
@@ -269,10 +268,8 @@ export default function DashboardPage() {
     return (
       <AppShell
         currentPath="/dashboard"
-        liveTableCount={liveEvents.length}
         onLogout={handleLogout}
         profile={profile}
-        savedVenueCount={savedVenueCount}
         unreadCount={unreadNotificationCount}
       >
         <div className="mx-auto flex min-h-[50vh] max-w-3xl flex-col justify-center">
@@ -295,10 +292,8 @@ export default function DashboardPage() {
   return (
     <AppShell
       currentPath="/dashboard"
-      liveTableCount={liveEvents.length}
       onLogout={handleLogout}
       profile={profile}
-      savedVenueCount={savedVenueCount}
       showFooter={false}
       unreadCount={unreadNotificationCount}
       wide

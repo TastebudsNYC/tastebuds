@@ -24,11 +24,13 @@ export function ModalShell({
   align = 'start',
   children,
   className,
+  initialFocus = 'first',
   onClose,
 }: {
   align?: 'center' | 'start'
   children: (controls: { requestClose: () => void }) => ReactNode
   className?: string
+  initialFocus?: 'container' | 'first'
   onClose: () => void
 }) {
   const [isClosing, setIsClosing] = useState(false)
@@ -50,7 +52,8 @@ export function ModalShell({
   useEffect(() => {
     const container = containerRef.current
     const focusable = getFocusableElements(container)
-    const initialTarget = focusable[0] ?? container
+    const initialTarget =
+      initialFocus === 'container' ? container : (focusable[0] ?? container)
 
     document.body.style.overflow = 'hidden'
     initialTarget?.focus()
@@ -105,7 +108,7 @@ export function ModalShell({
       document.body.style.overflow = ''
       window.removeEventListener('keydown', handleKeydown)
     }
-  }, [onClose])
+  }, [initialFocus, onClose])
 
   function requestClose() {
     if (isClosing) {
