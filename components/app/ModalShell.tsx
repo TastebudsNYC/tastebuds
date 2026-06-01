@@ -21,10 +21,12 @@ function getFocusableElements(container: HTMLElement | null) {
 }
 
 export function ModalShell({
+  align = 'start',
   children,
   className,
   onClose,
 }: {
+  align?: 'center' | 'start'
   children: (controls: { requestClose: () => void }) => ReactNode
   className?: string
   onClose: () => void
@@ -125,7 +127,8 @@ export function ModalShell({
       aria-labelledby={titleId}
       aria-modal="true"
       className={cx(
-        'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6',
+        'fixed inset-0 z-50 flex justify-center overflow-y-auto px-4 py-6',
+        align === 'center' ? 'items-center' : 'items-start',
         isClosing ? 'tb-overlay-exit' : 'tb-overlay-enter'
       )}
       onClick={requestClose}

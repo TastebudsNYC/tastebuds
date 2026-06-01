@@ -46,7 +46,7 @@ export function EventJoinConfirmModal({
       : `Join ${event.title}?`
 
   return (
-    <ModalShell className="max-w-xl" onClose={onCancel}>
+    <ModalShell align="center" className="max-w-xl" onClose={onCancel}>
       {({ requestClose }) => (
         <div className="rounded-[2rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] p-6 shadow-[0_30px_90px_rgba(20,20,20,0.28)] sm:p-7">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--accent-strong)]">

@@ -126,7 +126,7 @@ export function RestaurantDetailsModal({
       : null
 
   return (
-    <ModalShell className="max-w-5xl" onClose={onClose}>
+    <ModalShell align="center" className="max-w-5xl" onClose={onClose}>
       {({ requestClose }) => (
       <div className="max-h-[90vh] w-full overflow-hidden rounded-[2rem] bg-white shadow-[0_30px_90px_rgba(20,20,20,0.28)]">
         <div className="grid max-h-[90vh] overflow-y-auto md:grid-cols-[1.1fr_1fr]">
