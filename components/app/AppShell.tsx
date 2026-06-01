@@ -29,7 +29,6 @@ export function AppShell({
     ...(onLogout ? { onLogout } : {}),
     ...(profile !== undefined ? { profile } : {}),
     ...(unreadCount !== undefined ? { unreadCount } : {}),
-    ...(wide ? { wide } : {}),
   }
 
   return (

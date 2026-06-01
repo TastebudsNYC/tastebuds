@@ -130,8 +130,8 @@ export function ModalShell({
       aria-labelledby={titleId}
       aria-modal="true"
       className={cx(
-        'fixed inset-0 z-50 flex justify-center overflow-y-auto px-4 py-6',
-        align === 'center' ? 'items-center' : 'items-start',
+        'fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/55 px-4 overscroll-contain',
+        align === 'center' ? 'items-center py-6' : 'items-start pt-0 pb-6',
         isClosing ? 'tb-overlay-exit' : 'tb-overlay-enter'
       )}
       onClick={requestClose}
