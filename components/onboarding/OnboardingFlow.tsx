@@ -161,23 +161,10 @@ function StageShell({
           ? 'tb-onboarding-step-in-back'
           : 'tb-onboarding-step-in-forward'
         : ''
-  const wipeClass =
-    transitionPhase === 'out'
-      ? direction < 0
-        ? 'tb-onboarding-transition-out-back'
-        : 'tb-onboarding-transition-out-forward'
-      : transitionPhase === 'in'
-        ? direction < 0
-          ? 'tb-onboarding-transition-in-back'
-          : 'tb-onboarding-transition-in-forward'
-        : ''
 
   return (
     <main className={`tb-onboarding-shell ${stageAccent}`}>
       <div className="tb-onboarding-backdrop" />
-      {transitionPhase !== 'idle' ? (
-        <div className={`tb-onboarding-transition-plane ${wipeClass}`} />
-      ) : null}
       <div className="relative min-h-screen">
         <header className="tb-onboarding-header">
           <div className="tb-onboarding-logo-lockup">
@@ -829,11 +816,11 @@ export function OnboardingFlow({ mode }: { mode: FlowMode }) {
   const inputClassName =
     'tb-input min-h-[4.65rem] rounded-[1.6rem] border-[color:var(--border-soft)] bg-white/94 px-5 py-4 text-lg shadow-[0_10px_26px_rgba(11,19,36,0.05)]'
   const backButtonClass =
-    'h-[3.75rem] min-w-[8.5rem] px-9 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
+    'h-[3.75rem] min-w-[8.75rem] px-10 text-base font-bold shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
   const primaryButtonClass =
-    'h-[3.75rem] min-w-[10.5rem] px-10 text-base shadow-[0_18px_34px_rgba(245,158,11,0.24)]'
+    'h-16 min-w-[11rem] px-11 text-base font-bold shadow-[0_20px_38px_rgba(245,158,11,0.26)]'
   const secondaryActionButtonClass =
-    'h-[3.75rem] min-w-[10rem] px-8 text-base shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
+    'h-16 min-w-[10.5rem] px-9 text-base font-bold shadow-[0_12px_28px_rgba(11,19,36,0.08)]'
   const canContinueFromFooter =
     stage === 'drinks'
       ? true
