@@ -49,6 +49,35 @@ const NAV_ITEMS = [
     label: 'Events',
   },
   {
+    href: '/about',
+    icon: (
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <path
+          d="M12 10.5h.01"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M10.75 14.25h1.25V10.5h1v3.75H14"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    ),
+    label: 'About',
+  },
+  {
     href: '/notifications',
     icon: (
       <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
