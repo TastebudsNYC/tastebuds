@@ -171,21 +171,17 @@ function StageShell({
             <TastebudsLogo showTagline={false} size="sm" theme="dark" />
           </div>
           <div className="tb-onboarding-progress-meta">
+            <div className="text-right text-sm font-semibold tracking-[-0.01em] text-white/84">
+              Step {currentStep} of {progressTotal}
+            </div>
             {showLoginLink ? (
               <Link
-                className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--nav-bg)_72%,white)] transition hover:text-[color:var(--nav-bg)]"
+                className="text-sm font-semibold text-white/68 transition hover:text-white"
                 href="/login"
               >
                 Log in
               </Link>
-            ) : (
-              <span className="h-5" />
-            )}
-            <div className="w-full">
-              <div className="text-right text-sm font-semibold tracking-[-0.01em] text-[color:var(--nav-bg)]">
-                Step {currentStep} of {progressTotal}
-              </div>
-            </div>
+            ) : null}
           </div>
         </header>
 
