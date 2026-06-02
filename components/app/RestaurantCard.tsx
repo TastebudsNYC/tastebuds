@@ -1,11 +1,6 @@
 import { Button } from '@/components/app/Button'
 import { GooglePlacePhoto } from '@/components/app/GooglePlacePhoto'
-import { TasteTag } from '@/components/app/TasteTag'
-import {
-  cx,
-  formatMatchScore,
-  formatRestaurantLocationLine,
-} from '@/lib/app/format'
+import { cx, formatDistanceMiles, formatGooglePriceLevel } from '@/lib/app/format'
 import type { DashboardRestaurant } from '@/lib/app/types'
 
 const RESTAURANT_IMAGES = [
@@ -18,16 +13,93 @@ function getRestaurantImage(restaurant: DashboardRestaurant) {
   return RESTAURANT_IMAGES[restaurant.id % RESTAURANT_IMAGES.length] ?? RESTAURANT_IMAGES[0]!
 }
 
-function getSupportLine(restaurant: DashboardRestaurant) {
-  const values = restaurant.topMatchFactors?.filter(Boolean) ?? []
+function getMatchPercentage(score: number | null | undefined) {
+  if (typeof score !== 'number' || Number.isNaN(score)) {
+    return null
+  }
 
-  return values.length > 0
-    ? `Match: ${values.map((value) => value.toLowerCase()).join(' / ')}`
-    : 'Match: taste / budget / vibe'
+  return Math.max(0, Math.min(100, Math.round(score)))
 }
 
-function getStatusText(restaurant: DashboardRestaurant) {
-  return restaurant.isSaved ? 'Saved and watching' : 'Not saved yet'
+function getMatchLabel(score: number | null | undefined) {
+  if (typeof score !== 'number' || Number.isNaN(score)) {
+    return 'Worth a look'
+  }
+
+  if (score >= 80) {
+    return 'Excellent fit'
+  }
+
+  if (score >= 70) {
+    return 'Strong fit'
+  }
+
+  if (score >= 60) {
+    return 'Worth a look'
+  }
+
+  return 'Maybe'
+}
+
+function getStatusBadge(restaurant: DashboardRestaurant) {
+  if (restaurant.isSaved && restaurant.availableEventCount > 0) {
+    return 'Saved & watching'
+  }
+
+  if (restaurant.isSaved) {
+    return 'Watching'
+  }
+
+  if (restaurant.availableEventCount > 0) {
+    return restaurant.availableEventCount === 1 ? 'Live table' : 'Live tables'
+  }
+
+  return null
+}
+
+function getReasonChips(restaurant: DashboardRestaurant) {
+  const values = [
+    ...(restaurant.topMatchFactors ?? []),
+    ...(restaurant.matchTags ?? []),
+    restaurant.restaurant_cuisines?.[0] ?? null,
+    ...(restaurant.venue_vibes ?? []),
+  ].filter((value): value is string => Boolean(value))
+
+  return Array.from(new Set(values)).slice(0, 4)
+}
+
+function getMetadataItems(restaurant: DashboardRestaurant) {
+  const areaLabel =
+    restaurant.neighbourhood && restaurant.neighbourhood !== restaurant.subregion
+      ? restaurant.neighbourhood
+      : restaurant.subregion
+  const distanceLabel = formatDistanceMiles(restaurant.venueDistanceKm)
+  const cuisineLabel = restaurant.restaurant_cuisines?.[0] ?? null
+  const priceLabel = formatGooglePriceLevel(restaurant.venue_price ?? restaurant.googlePriceLevel)
+
+  return [areaLabel, distanceLabel, cuisineLabel, priceLabel].filter(
+    (value): value is string => Boolean(value)
+  )
+}
+
+function getSupportingCopy(restaurant: DashboardRestaurant) {
+  if (restaurant.isSaved && restaurant.availableEventCount > 0) {
+    return `${restaurant.availableEventCount} live table${
+      restaurant.availableEventCount === 1 ? '' : 's'
+    } ready to open.`
+  }
+
+  if (restaurant.isSaved) {
+    return 'Watching for tables. We will tell you when something opens.'
+  }
+
+  if (restaurant.availableEventCount > 0) {
+    return `${restaurant.availableEventCount} live table${
+      restaurant.availableEventCount === 1 ? '' : 's'
+    } already open if you want to jump in now.`
+  }
+
+  return 'Save it to hear when a table opens.'
 }
 
 export function RestaurantCard({
@@ -47,153 +119,124 @@ export function RestaurantCard({
   restaurant: DashboardRestaurant
   saving?: boolean
 }) {
-  const locationLine = formatRestaurantLocationLine({
-    distanceKm: restaurant.venueDistanceKm,
-    neighbourhood: restaurant.neighbourhood,
-    subregion: restaurant.subregion,
-  })
-  const tags =
-    restaurant.matchTags?.length > 0
-      ? restaurant.matchTags
-      : [restaurant.restaurant_cuisines?.[0], restaurant.subregion, restaurant.venue_price].filter(
-          (value): value is string => Boolean(value)
-        )
-  const statusText = getStatusText(restaurant)
-  const eventText =
-    restaurant.availableEventCount > 0
-      ? restaurant.availableEventCount === 1
-        ? 'Live table available'
-        : 'Live tables available'
-      : 'No live tables yet'
+  const metadataItems = getMetadataItems(restaurant)
+  const reasonChips = getReasonChips(restaurant)
+  const matchPercentage = getMatchPercentage(restaurant.matchScore)
+  const matchLabel = getMatchLabel(restaurant.matchScore)
+  const statusBadge = getStatusBadge(restaurant)
+  const supportingCopy = getSupportingCopy(restaurant)
+  const description =
+    restaurant.venueMatchSummary ||
+    restaurant.googleEditorialSummary ||
+    'Matches enough of your taste profile to be worth a closer look.'
 
   return (
     <article
       className={cx(
-        'group overflow-hidden rounded-[1.35rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_18px_44px_rgba(74,31,20,0.07)] tb-card-interactive',
+        'group overflow-hidden rounded-[1.75rem] border border-[color:var(--border-soft)] bg-white shadow-[0_18px_44px_rgba(12,18,32,0.08)] tb-card-interactive',
         highlighted ? 'border-[color:var(--accent-border)] shadow-[0_22px_50px_rgba(255,193,67,0.18)]' : '',
         flashState === 'saved' ? 'tb-card-flash' : ''
       )}
       onMouseEnter={() => onHighlightChange?.(restaurant.id)}
       onMouseLeave={() => onHighlightChange?.(null)}
     >
-      <div className="grid gap-0 xl:grid-cols-[180px_minmax(0,1fr)]">
-        <div className="relative min-h-[180px] overflow-hidden xl:min-h-full">
+      <div className="grid md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_190px]">
+        <div className="relative min-h-[220px] overflow-hidden md:row-span-2 md:min-h-full xl:row-span-1">
           <GooglePlacePhoto
             alt={restaurant.name}
-            attributionClassName="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white"
+            attributionClassName="absolute bottom-3 left-3 z-[2] rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white"
             enableCarousel={false}
             fallbackSrc={getRestaurantImage(restaurant)}
             imageClassName="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]"
             placeId={restaurant.googlePlaceId}
           />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          {statusBadge ? (
+            <div className="absolute left-4 top-4 z-[2]">
+              <span className="inline-flex rounded-full border border-white/35 bg-white/88 px-3 py-1 text-xs font-semibold text-[color:var(--nav-bg)] shadow-[0_10px_24px_rgba(12,18,32,0.12)] backdrop-blur-sm">
+                {statusBadge}
+              </span>
+            </div>
+          ) : null}
         </div>
 
-        <div className="p-5 md:p-6">
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_230px] xl:items-center">
+        <div className="min-w-0 px-5 py-5 md:px-6 md:py-6 xl:pr-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-start gap-4">
-                <div className="inline-flex min-w-[94px] flex-col justify-center rounded-[0.95rem] border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-3 text-[color:var(--accent-strong)] shadow-[0_10px_24px_rgba(74,31,20,0.06)]">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--accent-deep)]">
-                    Match
-                  </span>
-                  <div className="mt-2 flex items-end gap-1">
-                    <span className="text-[1.9rem] font-black leading-none">
-                      {formatMatchScore(restaurant.matchScore)}
-                    </span>
-                    <span className="pb-0.5 text-[11px] font-semibold tracking-[0.02em] text-[color:var(--accent-strong)]">
-                      /100
-                    </span>
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--status-text)] transition-[filter,box-shadow] duration-180 group-hover:brightness-[1.02]">
-                      {restaurant.isSaved ? <span aria-hidden="true">✓</span> : null}
-                      {statusText}
-                    </p>
-                    <p className="text-sm font-medium text-[color:var(--text-secondary)]">
-                      {locationLine}
-                    </p>
-                  </div>
-
-                  <h2 className="mt-3 text-[2rem] font-black tracking-tight text-[color:var(--foreground)]">
-                    {restaurant.name}
-                  </h2>
-
-                  {restaurant.googleRating !== null ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[color:var(--accent-strong)]">
-                      <span className="text-base leading-none">*</span>
-                      <span className="font-semibold">{restaurant.googleRating.toFixed(1)}</span>
-                      <span className="text-[color:var(--text-secondary)]">
-                        {restaurant.googleUserRatingsTotal
-                          ? `(${restaurant.googleUserRatingsTotal} reviews)`
-                          : '(Google rating)'}
-                      </span>
-                    </div>
-                  ) : null}
-
-                  <p className="mt-4 max-w-[44rem] text-[1.12rem] font-semibold leading-8 text-[color:var(--foreground)]">
-                    {restaurant.venueMatchSummary || 'Matches enough of your taste profile to be worth saving.'}
-                  </p>
-
-                  <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{getSupportLine(restaurant)}</p>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {tags.map((value) => (
-                      <TasteTag key={`${restaurant.id}-${value}`}>{value}</TasteTag>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="flex flex-col gap-2.5 rounded-[1.1rem] border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] p-4 xl:ml-auto xl:min-w-[220px]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="inline-flex items-center gap-2 rounded-full bg-[color:var(--status-bg)] px-3 py-2 text-sm font-semibold text-[color:var(--status-text)]">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[color:var(--status-strong)]" />
-                {statusText}
-              </div>
-
-              {restaurant.isSaved ? (
-                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">{eventText}</p>
-              ) : restaurant.availableEventCount > 0 ? (
-                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">
-                  Save first, then sign up for any hosted tables here.
+              <h2 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-[color:var(--foreground)] md:text-[2.15rem]">
+                {restaurant.name}
+              </h2>
+              {metadataItems.length > 0 ? (
+                <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
+                  {metadataItems.join(' / ')}
                 </p>
-              ) : (
-                <p className="text-sm leading-6 text-[color:var(--text-secondary)]">Save to hear when a table opens.</p>
-              )}
-
-              <div className="flex flex-col gap-2 pt-1">
-                {restaurant.isSaved ? (
-                  <Button className="min-h-[48px] group-hover:shadow-[0_14px_24px_rgba(242,169,0,0.22)]" onClick={() => onOpenDetails?.(restaurant)}>
-                    View venue
-                  </Button>
-                ) : (
-                  <>
-                    {onToggleSaved ? (
-                      <Button
-                        className="min-h-[48px] group-hover:shadow-[0_14px_24px_rgba(242,169,0,0.22)]"
-                        disabled={saving}
-                        onClick={() => onToggleSaved(restaurant.id, 'save')}
-                      >
-                        {saving ? 'Saving...' : 'Save venue'}
-                      </Button>
-                    ) : null}
-                    <button
-                      className="text-left text-sm font-semibold text-[color:var(--nav-bg)] transition hover:text-[color:var(--accent-strong)]"
-                      onClick={() => onOpenDetails?.(restaurant)}
-                      type="button"
-                    >
-                      View venue
-                    </button>
-                  </>
-                )}
-              </div>
+              ) : null}
             </div>
+            {statusBadge ? (
+              <span className="inline-flex rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--status-text)] md:hidden">
+                {statusBadge}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-4 max-w-[44rem] text-[1.02rem] leading-7 text-[color:var(--foreground)] md:text-[1.08rem]">
+            {description}
+          </p>
+
+          {reasonChips.length > 0 ? (
+            <div className="mt-5 flex flex-wrap gap-2">
+              {reasonChips.map((value) => (
+                <span
+                  className="inline-flex rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-3 py-1.5 text-xs font-medium text-[color:var(--text-secondary)]"
+                  key={`${restaurant.id}-${value}`}
+                >
+                  {value}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className="flex flex-col justify-between gap-5 border-t border-[color:var(--border-soft)] px-5 py-5 md:col-start-2 md:px-6 md:pt-0 xl:col-start-auto xl:border-l xl:border-t-0 xl:px-5 xl:py-6"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex flex-col gap-3 xl:items-end xl:text-right">
+            <div>
+              <p className="text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:var(--nav-bg)]">
+                {matchPercentage !== null ? `${matchPercentage}% match` : 'Match pending'}
+              </p>
+              <p className="mt-1 text-sm font-medium text-[color:var(--accent-strong)]">
+                {matchLabel}
+              </p>
+            </div>
+            <p className="max-w-[18rem] text-sm leading-6 text-[color:var(--text-secondary)]">
+              {supportingCopy}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            <Button
+              className="min-h-[48px] group-hover:shadow-[0_14px_24px_rgba(242,169,0,0.22)]"
+              onClick={() => onOpenDetails?.(restaurant)}
+              variant={restaurant.isSaved ? 'primary' : 'secondary'}
+            >
+              View venue
+            </Button>
+
+            {restaurant.isSaved ? (
+              <span className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-5 py-3 text-sm font-semibold text-[color:var(--status-text)]">
+                {restaurant.availableEventCount > 0 ? 'Watching live tables' : 'Watching'}
+              </span>
+            ) : onToggleSaved ? (
+              <Button
+                className="min-h-[48px]"
+                disabled={saving}
+                onClick={() => onToggleSaved(restaurant.id, 'save')}
+              >
+                {saving ? 'Saving...' : 'Save venue'}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
