@@ -90,7 +90,7 @@ function getSupportingCopy(restaurant: DashboardRestaurant) {
   }
 
   if (restaurant.isSaved) {
-    return 'Watching for tables. We will tell you when something opens.'
+    return 'No live table yet.'
   }
 
   if (restaurant.availableEventCount > 0) {
@@ -225,9 +225,16 @@ export function RestaurantCard({
             </Button>
 
             {restaurant.isSaved ? (
-              <span className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-[color:var(--border-soft)] bg-[color:var(--surface-soft)] px-5 py-3 text-sm font-semibold text-[color:var(--status-text)]">
-                {restaurant.availableEventCount > 0 ? 'Watching live tables' : 'Watching'}
-              </span>
+              onToggleSaved ? (
+                <Button
+                  className="min-h-[48px]"
+                  disabled={saving}
+                  onClick={() => onToggleSaved(restaurant.id, 'unsave')}
+                  variant="secondary"
+                >
+                  {saving ? 'Updating...' : 'Unsave'}
+                </Button>
+              ) : null
             ) : onToggleSaved ? (
               <Button
                 className="min-h-[48px]"
