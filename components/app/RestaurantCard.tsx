@@ -203,8 +203,8 @@ export function RestaurantCard({
         >
           <div className="flex flex-col gap-3 xl:items-end xl:text-right">
             <div>
-              <p className="text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:var(--nav-bg)]">
-                {matchPercentage !== null ? `${matchPercentage}% match` : 'Match pending'}
+              <p className="text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:var(--nav-bg)] [text-shadow:0_0_18px_rgba(245,158,11,0.18),0_1px_0_rgba(255,255,255,0.55)]">
+                {matchPercentage !== null ? `${matchPercentage}% Match` : 'Match pending'}
               </p>
               <p className="mt-1 text-sm font-medium text-[color:var(--accent-strong)]">
                 {matchLabel}
