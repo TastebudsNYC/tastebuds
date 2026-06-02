@@ -261,7 +261,7 @@ export function RestaurantDetailsModal({
               ) : null}
               {websiteUri ? (
                 <Button href={websiteUri} target="_blank" variant="secondary">
-                  Website
+                  Menu
                 </Button>
               ) : null}
             </div>

@@ -120,6 +120,7 @@ type FeedbackRow = {
 type RestaurantPlaceRow = {
   google_place_id: string | null
   google_rating: number | null
+  google_website_uri: string | null
   google_user_ratings_total: number | null
   id: number
 }
@@ -274,7 +275,7 @@ export async function GET(request: Request) {
     const { data: restaurantPlaces, error: restaurantPlacesError } = restaurantIds.length
       ? await adminClient
           .from('restaurants')
-          .select('google_place_id, google_rating, google_user_ratings_total, id')
+          .select('google_place_id, google_rating, google_user_ratings_total, google_website_uri, id')
           .in('id', restaurantIds)
           .returns<RestaurantPlaceRow[]>()
       : { data: [], error: null }
@@ -338,6 +339,9 @@ export async function GET(request: Request) {
     )
     const googlePlaceIdByRestaurantId = new Map(
       (restaurantPlaces ?? []).map((restaurant) => [restaurant.id, restaurant.google_place_id])
+    )
+    const websiteUriByRestaurantId = new Map(
+      (restaurantPlaces ?? []).map((restaurant) => [restaurant.id, restaurant.google_website_uri])
     )
 
     const attendeeCountByEvent = new Map<number, number>()
@@ -569,6 +573,10 @@ export async function GET(request: Request) {
           restaurantGooglePlaceId:
             event.restaurant_id !== null
               ? (googlePlaceIdByRestaurantId.get(event.restaurant_id) ?? null)
+              : null,
+          restaurantWebsiteUri:
+            event.restaurant_id !== null
+              ? (websiteUriByRestaurantId.get(event.restaurant_id) ?? null)
               : null,
           venueDistanceKm,
           venue_formats: event.venue_formats,

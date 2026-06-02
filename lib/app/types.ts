@@ -97,6 +97,7 @@ export type DashboardEvent = {
   projectedRestaurantScore: number
   restaurant_cuisines: string[] | null
   restaurantGooglePlaceId: string | null
+  restaurantWebsiteUri?: string | null
   restaurant_name: string
   restaurant_neighbourhood: string | null
   restaurant_subregion: string

@@ -837,6 +837,11 @@ export function EventCard({
                     Back to events
                   </Button>
                 )}
+                {event.restaurantWebsiteUri ? (
+                  <Button href={event.restaurantWebsiteUri} target="_blank" variant="secondary">
+                    Menu
+                  </Button>
+                ) : null}
                 {(event.status !== 'open' || event.spotsLeft === 0) && !event.isJoined && !event.hasEnded ? (
                   <p className="w-full text-sm text-[color:var(--text-muted)]">
                     This table is full. You can still open the join confirmation for details.
