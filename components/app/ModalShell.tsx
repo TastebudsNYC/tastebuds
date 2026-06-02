@@ -27,7 +27,7 @@ export function ModalShell({
   initialFocus = 'first',
   onClose,
 }: {
-  align?: 'center' | 'start'
+  align?: 'center' | 'responsive-center' | 'start'
   children: (controls: { requestClose: () => void }) => ReactNode
   className?: string
   initialFocus?: 'container' | 'first'
@@ -131,7 +131,11 @@ export function ModalShell({
       aria-modal="true"
       className={cx(
         'fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/55 px-4 overscroll-contain',
-        align === 'center' ? 'items-center py-6' : 'items-start pt-0 pb-6',
+        align === 'center'
+          ? 'items-center py-6'
+          : align === 'responsive-center'
+            ? 'items-start py-4 sm:items-center sm:py-6'
+            : 'items-start pt-0 pb-6',
         isClosing ? 'tb-overlay-exit' : 'tb-overlay-enter'
       )}
       onClick={requestClose}

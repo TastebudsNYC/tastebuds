@@ -46,7 +46,7 @@ export function MapViewModal({
   const savedCount = restaurants.filter((restaurant) => restaurant.isSaved).length
 
   return (
-    <ModalShell className="max-w-7xl" onClose={onClose}>
+    <ModalShell align="responsive-center" className="max-w-7xl" onClose={onClose}>
       {({ requestClose }) => (
         <div className="overflow-hidden rounded-[2rem] border border-[color:var(--border-soft)] bg-[color:var(--surface)] shadow-[0_30px_90px_rgba(20,20,20,0.28)]">
           <div className="border-b border-[color:var(--border-soft)] bg-[linear-gradient(180deg,rgba(255,246,233,0.92)_0%,rgba(255,255,255,0.98)_100%)] px-6 py-5">
