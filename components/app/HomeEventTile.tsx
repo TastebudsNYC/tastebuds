@@ -131,8 +131,8 @@ export function HomeEventTile({
 
   return (
     <article className="group overflow-hidden rounded-[1.75rem] border border-[color:var(--border-soft)] bg-white shadow-[0_18px_44px_rgba(12,18,32,0.08)]">
-      <div className="grid lg:grid-cols-[280px_minmax(0,1fr)_220px]">
-        <div className="relative min-h-[240px] overflow-hidden lg:min-h-full">
+      <div className="grid xl:grid-cols-[280px_minmax(0,1fr)_220px]">
+        <div className="relative min-h-[240px] overflow-hidden xl:min-h-full">
           <GooglePlacePhoto
             alt={event.restaurant_name}
             attributionClassName="absolute bottom-3 left-3 z-[2] rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white"
@@ -172,7 +172,7 @@ export function HomeEventTile({
           </p>
         </div>
 
-        <div className="flex flex-col justify-between gap-6 border-t border-[color:var(--border-soft)] bg-white px-5 py-5 md:px-6 lg:border-l lg:border-t-0 lg:px-5 lg:py-6">
+        <div className="flex flex-col justify-between gap-6 border-t border-[color:var(--border-soft)] bg-white px-5 py-5 md:px-6 xl:border-l xl:border-t-0 xl:px-5 xl:py-6">
           <div className="space-y-4">
             <div>
               <p className="text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:var(--nav-bg)] [text-shadow:0_0_18px_rgba(245,158,11,0.18),0_1px_0_rgba(255,255,255,0.55)]">

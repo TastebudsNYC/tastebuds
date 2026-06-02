@@ -376,7 +376,7 @@ export default function DashboardPage() {
               </div>
 
               {liveEvents.length > 0 ? (
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-5">
                   {liveEvents.map((event, index) => (
                     <HomeEventTile event={event} index={index} key={event.id} />
                   ))}
