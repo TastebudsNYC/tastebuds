@@ -74,11 +74,11 @@ export function TopNav({
     <header className="sticky top-0 z-40 w-full border-b border-white/8 bg-[color:var(--nav-bg)] text-white shadow-[0_10px_24px_rgba(0,20,38,0.18)]">
       <div
         className={cx(
-          'mx-auto flex h-[5rem] w-full items-center justify-between gap-4',
+          'mx-auto flex h-[6rem] w-full items-center justify-between gap-5',
           wide ? 'px-[clamp(1.5rem,4vw,4rem)]' : 'max-w-7xl px-6 lg:px-8'
         )}
       >
-        <div className="flex min-w-0 items-center gap-4 lg:gap-8">
+        <div className="flex min-w-0 items-center gap-5 lg:gap-9">
           <Link
             aria-label="Tastebuds home"
             className="group inline-flex min-w-0 items-center rounded-full px-1 py-1 text-white transition hover:text-white"
@@ -86,7 +86,7 @@ export function TopNav({
           >
             <TastebudsLogo
               className="transition duration-150 group-hover:translate-x-[1px]"
-              size="sm"
+              size="md"
               theme="dark"
             />
           </Link>
@@ -99,7 +99,7 @@ export function TopNav({
               return (
                 <Link
                   className={cx(
-                    'relative inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold tracking-tight transition-colors duration-150',
+                    'relative inline-flex items-center gap-2 rounded-full px-3.5 py-2.5 text-sm font-semibold tracking-tight transition-colors duration-150',
                     isActive
                       ? 'bg-white/6 text-[color:var(--accent)]'
                       : 'text-[#d8e2ec] hover:bg-white/6 hover:text-white'
@@ -129,12 +129,12 @@ export function TopNav({
               <button
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
-                className="tb-pressable inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-2 text-left text-white transition hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]/60"
+                className="tb-pressable inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-white transition hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]/60"
                 onClick={() => setMenuOpen((current) => !current)}
                 type="button"
               >
                 <ProfileAvatar
-                  className="h-8 w-8"
+                  className="h-9 w-9"
                   displayName={displayName}
                   fallbackClassName="bg-[color:var(--accent)] text-[color:var(--accent-text)]"
                   textClassName="text-xs font-bold"
