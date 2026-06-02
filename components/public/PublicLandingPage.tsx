@@ -28,17 +28,17 @@ const heroSlides = [
 
 const steps = [
   {
-    id: 'step 1',
+    id: 'STEP 1',
     title: 'Build your taste profile',
     copy: 'Tell us what you like, what you spend, and the kind of night you want.',
   },
   {
-    id: 'step 2',
+    id: 'STEP 2',
     title: 'See restaurants that fit',
     copy: 'We match places to your taste, budget and vibe.',
   },
   {
-    id: 'step 3',
+    id: 'STEP 3',
     title: 'Join a hosted table',
     copy: 'Claim a seat with people who said yes to the same place.',
   },
@@ -46,17 +46,17 @@ const steps = [
 
 const matchingInputs = [
   {
-    id: 'food',
+    id: 'FOOD',
     title: 'What you actually want to eat',
     copy: 'Cuisines, cravings and places you would genuinely say yes to.',
   },
   {
-    id: 'mood',
+    id: 'MOOD',
     title: 'The sort of room you want',
     copy: 'Quiet, lively, polished, casual, first-date-safe, big-table energy.',
   },
   {
-    id: 'plan',
+    id: 'PLAN',
     title: 'Budget, area and timing',
     copy: 'So the table fits your actual evening, not an imaginary perfect one.',
   },
