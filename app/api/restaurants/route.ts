@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
 import {
+  attachPromotionPriorities,
+  mergeOrganicAndPromotedRows,
+  resolveActivePromotionRecords,
+} from '@/lib/advertising-resolver'
+import {
   calculateDistanceKm,
   type ProfileForScoring,
 } from '@/lib/events'
@@ -15,6 +20,8 @@ import {
   createServerSupabaseAdminClient,
   getUserFromAccessToken,
 } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
 
 type ProfileRow = {
   age_range_comfort: string[] | null
@@ -225,6 +232,27 @@ export async function GET(request: Request) {
       throw new Error(mySignupsResponse.error.message)
     }
 
+    const resolvedPromotions = await resolveActivePromotionRecords(adminClient, 'restaurant')
+    const promotedRestaurantIds = resolvedPromotions.map((record) => record.targetId)
+    const organicRestaurantIds = new Set((restaurantsResponse.data ?? []).map((restaurant) => restaurant.id))
+    const missingPromotedRestaurantIds = promotedRestaurantIds.filter(
+      (restaurantId) => !organicRestaurantIds.has(restaurantId)
+    )
+    const missingPromotedRestaurantsResponse = missingPromotedRestaurantIds.length
+      ? await adminClient
+          .from('restaurants')
+          .select(
+            'cuisines, formatted_address, google_business_status, google_editorial_summary, google_good_for_groups, google_good_for_watching_sports, google_last_synced_at, google_live_music, google_maps_uri, google_open_now, google_opening_hours, google_outdoor_seating, google_photo_refs, google_place_id, google_price_level, google_primary_type, google_rating, google_reservable, google_serves_beer, google_serves_brunch, google_serves_cocktails, google_serves_dessert, google_serves_dinner, google_serves_vegetarian_food, google_serves_wine, google_types, google_user_ratings_total, google_website_uri, id, menu_experience_tags, name, neighbourhood, subregion, venue_crowd, venue_energy, venue_formats, venue_good_for_casual_meetups, venue_good_for_cocktails, venue_good_for_conversation, venue_good_for_dinner, venue_group_friendly, venue_indoor_outdoor, venue_latitude, venue_longitude, venue_music, venue_noise_level, venue_price, venue_reservation_friendly, venue_scene, venue_seating_types, venue_setting, venue_vibes'
+          )
+          .is('archived_at', null)
+          .in('id', missingPromotedRestaurantIds)
+          .returns<RestaurantRow[]>()
+      : { data: [], error: null }
+
+    if (missingPromotedRestaurantsResponse.error) {
+      throw new Error(missingPromotedRestaurantsResponse.error.message)
+    }
+
     const scoringProfile: ProfileForScoring = {
       age_range_comfort: profile.age_range_comfort,
       bio: profile.bio,
@@ -256,7 +284,11 @@ export async function GET(request: Request) {
     )
     const eventsByRestaurantId = new Map<number, EventRow[]>()
     const venueTraitsByRestaurantId = new Map<number, VenueTraitsRow>()
-    const restaurantIds = (restaurantsResponse.data ?? []).map((restaurant) => restaurant.id)
+    const mergedRestaurantRows = mergeOrganicAndPromotedRows(
+      restaurantsResponse.data ?? [],
+      missingPromotedRestaurantsResponse.data ?? []
+    )
+    const restaurantIds = mergedRestaurantRows.map((restaurant) => restaurant.id)
 
     if (restaurantIds.length > 0) {
       const { data: venueTraits, error: venueTraitsError } = await adminClient
@@ -287,7 +319,7 @@ export async function GET(request: Request) {
 
     const explanationSet = new Set<string>()
 
-    const restaurants = (restaurantsResponse.data ?? [])
+    const restaurants = mergedRestaurantRows
       .map((restaurant) => {
         const restaurantEvents = eventsByRestaurantId.get(restaurant.id) ?? []
         const isSaved = savedRestaurantIds.has(restaurant.id)
@@ -412,7 +444,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       onboardingRequired: false,
-      restaurants,
+      restaurants: attachPromotionPriorities(restaurants, resolvedPromotions),
     })
   } catch (error) {
     return NextResponse.json(

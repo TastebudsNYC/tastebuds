@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/app/PageHeader'
 import { RestaurantCard } from '@/components/app/RestaurantCard'
 import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { useToast } from '@/components/app/ToastProvider'
+import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
   fetchNotifications,
   fetchRestaurants,
@@ -113,6 +114,32 @@ function getTuneBoost(restaurant: DashboardRestaurant, tune: TuneOption | null) 
 
 function formatLiveTables(count: number) {
   return `${count} live ${count === 1 ? 'table' : 'tables'}`
+}
+
+function compareRestaurantsOrganically(
+  left: DashboardRestaurant,
+  right: DashboardRestaurant,
+  input: {
+    activeTune: TuneOption | null
+    showLiveOnly: boolean
+  }
+) {
+  if (input.showLiveOnly && right.availableEventCount !== left.availableEventCount) {
+    return right.availableEventCount - left.availableEventCount
+  }
+
+  if (right.availableEventCount !== left.availableEventCount) {
+    return right.availableEventCount - left.availableEventCount
+  }
+
+  const leftRank = left.matchScore + getTuneBoost(left, input.activeTune)
+  const rightRank = right.matchScore + getTuneBoost(right, input.activeTune)
+
+  if (rightRank !== leftRank) {
+    return rightRank - leftRank
+  }
+
+  return left.name.localeCompare(right.name)
 }
 
 function matchesTravelFilter(
@@ -513,6 +540,14 @@ export default function RestaurantsPage() {
   )
   const visibleRestaurants = useMemo(() => {
     const query = searchWithinMatches.trim().toLowerCase()
+    const applicableListSurfaces = [
+      ...(query ? (['restaurant_search'] as const) : []),
+      ...(selectedCuisine !== 'all' ? (['restaurant_category'] as const) : []),
+      ...(selectedArea !== 'all' ? (['restaurant_neighbourhood'] as const) : []),
+      ...(query || selectedCuisine !== 'all' || selectedArea !== 'all'
+        ? []
+        : (['restaurant_search'] as const)),
+    ]
 
     return restaurants
       .filter((restaurant) => !showSavedOnly || restaurant.isSaved)
@@ -530,24 +565,16 @@ export default function RestaurantsPage() {
           restaurant.subregion === selectedArea ||
           restaurant.neighbourhood === selectedArea
       )
-      .sort((left, right) => {
-        if (showLiveOnly && right.availableEventCount !== left.availableEventCount) {
-          return right.availableEventCount - left.availableEventCount
-        }
-
-        if (right.availableEventCount !== left.availableEventCount) {
-          return right.availableEventCount - left.availableEventCount
-        }
-
-        const leftRank = left.matchScore + getTuneBoost(left, activeTune)
-        const rightRank = right.matchScore + getTuneBoost(right, activeTune)
-
-        if (rightRank !== leftRank) {
-          return rightRank - leftRank
-        }
-
-        return left.name.localeCompare(right.name)
-      })
+      .sort((left, right) =>
+        compareEntitiesWithPromotion(left, right, {
+          organicCompare: (organicLeft, organicRight) =>
+            compareRestaurantsOrganically(organicLeft, organicRight, {
+              activeTune,
+              showLiveOnly,
+            }),
+          surfaces: applicableListSurfaces,
+        })
+      )
   }, [
     activeTune,
     restaurants,
@@ -573,8 +600,20 @@ export default function RestaurantsPage() {
     [visibleRestaurants]
   )
   const unsavedVisibleRestaurants = useMemo(
-    () => visibleRestaurants.filter((restaurant) => !restaurant.isSaved),
-    [visibleRestaurants]
+    () =>
+      visibleRestaurants
+        .filter((restaurant) => !restaurant.isSaved)
+        .sort((left, right) =>
+          compareEntitiesWithPromotion(left, right, {
+            organicCompare: (organicLeft, organicRight) =>
+              compareRestaurantsOrganically(organicLeft, organicRight, {
+                activeTune,
+                showLiveOnly,
+              }),
+            surfaces: ['restaurant_recommendations'],
+          })
+        ),
+    [activeTune, showLiveOnly, visibleRestaurants]
   )
   const liveVisibleCount = useMemo(
     () => visibleRestaurants.filter((restaurant) => restaurant.availableEventCount > 0).length,

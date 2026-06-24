@@ -13,6 +13,7 @@ import { EventJoinConfirmModal } from '@/components/app/EventJoinConfirmModal'
 import { AppPageSkeleton } from '@/components/app/LoadingSkeleton'
 import { PageHeader } from '@/components/app/PageHeader'
 import { useToast } from '@/components/app/ToastProvider'
+import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
   fetchEvents,
   fetchNotifications,
@@ -140,6 +141,30 @@ function getSimilarEvents(allEvents: DashboardEvent[], event: DashboardEvent) {
       return left.starts_at.localeCompare(right.starts_at)
     })
     .slice(0, 3)
+}
+
+function compareEventsOrganically(
+  left: DashboardEvent,
+  right: DashboardEvent,
+  sortBy: EventSort
+) {
+  if (sortBy === 'soonest') {
+    return left.starts_at.localeCompare(right.starts_at)
+  }
+
+  if (sortBy === 'seats' && right.spotsLeft !== left.spotsLeft) {
+    return right.spotsLeft - left.spotsLeft
+  }
+
+  if (Number(right.isJoined) !== Number(left.isJoined)) {
+    return Number(right.isJoined) - Number(left.isJoined)
+  }
+
+  if (right.projectedRestaurantScore !== left.projectedRestaurantScore) {
+    return right.projectedRestaurantScore - left.projectedRestaurantScore
+  }
+
+  return left.starts_at.localeCompare(right.starts_at)
 }
 
 export default function EventsPage() {
@@ -399,27 +424,13 @@ export default function EventsPage() {
         (event) => selectedSubregion === 'all' || event.restaurant_subregion === selectedSubregion
       )
       .filter((event) => matchesEventTravelFilter(event, profile, selectedTravel))
-      .sort((left, right) => {
-        if (sortBy === 'soonest') {
-          return left.starts_at.localeCompare(right.starts_at)
-        }
-
-        if (sortBy === 'seats') {
-          if (right.spotsLeft !== left.spotsLeft) {
-            return right.spotsLeft - left.spotsLeft
-          }
-        }
-
-        if (Number(right.isJoined) !== Number(left.isJoined)) {
-          return Number(right.isJoined) - Number(left.isJoined)
-        }
-
-        if (right.projectedRestaurantScore !== left.projectedRestaurantScore) {
-          return right.projectedRestaurantScore - left.projectedRestaurantScore
-        }
-
-        return left.starts_at.localeCompare(right.starts_at)
-      })
+      .sort((left, right) =>
+        compareEntitiesWithPromotion(left, right, {
+          organicCompare: (organicLeft, organicRight) =>
+            compareEventsOrganically(organicLeft, organicRight, sortBy),
+          surfaces: ['event_list'],
+        })
+      )
     const pastEvents = visibleEvents
       .filter(isRelevantPastEvent)
       .sort((left, right) => right.starts_at.localeCompare(left.starts_at))

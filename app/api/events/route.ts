@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 
 import {
+  attachPromotionPriorities,
+  mergeOrganicAndPromotedRows,
+  resolveActivePromotionRecords,
+} from '@/lib/advertising-resolver'
+import {
   calculateDistanceKm,
   describeVenueMatch,
   getVenueMatchFactors,
@@ -14,6 +19,8 @@ import {
   createServerSupabaseAdminClient,
   getUserFromAccessToken,
 } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
 
 type EventRow = {
   capacity: number
@@ -220,7 +227,32 @@ export async function GET(request: Request) {
       throw new Error(savedRestaurantsError.message)
     }
 
-    const allEventIds = (events ?? []).map((event) => event.id)
+    const resolvedPromotions = await resolveActivePromotionRecords(adminClient, 'event')
+    const promotedEventIds = resolvedPromotions.map((record) => record.targetId)
+    const organicEventIds = new Set((events ?? []).map((event) => event.id))
+    const missingPromotedEventIds = promotedEventIds.filter((eventId) => !organicEventIds.has(eventId))
+    const { data: missingPromotedEvents, error: missingPromotedEventsError } = missingPromotedEventIds.length
+      ? await adminClient
+          .from('events')
+          .select(
+            'capacity, description, duration_minutes, google_good_for_groups, google_good_for_watching_sports, google_live_music, google_open_now, google_opening_hours, google_outdoor_seating, google_reservable, google_serves_beer, google_serves_brunch, google_serves_cocktails, google_serves_dessert, google_serves_dinner, google_serves_vegetarian_food, google_serves_wine, id, intent, menu_experience_tags, minimum_viable_attendees, restaurant_id, restaurant_cuisines, restaurant_name, restaurant_neighbourhood, restaurant_subregion, starts_at, status, title, venue_crowd, venue_energy, venue_formats, venue_good_for_casual_meetups, venue_good_for_cocktails, venue_good_for_conversation, venue_good_for_dinner, venue_group_friendly, venue_indoor_outdoor, venue_latitude, venue_longitude, venue_music, venue_noise_level, venue_price, venue_reservation_friendly, venue_scene, venue_seating_types, venue_setting, venue_vibes, viability_status'
+          )
+          .neq('status', 'cancelled')
+          .is('archived_at', null)
+          .gte(
+            'starts_at',
+            new Date(Date.now() - PAST_EVENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
+          )
+          .in('id', missingPromotedEventIds)
+          .returns<EventRow[]>()
+      : { data: [], error: null }
+
+    if (missingPromotedEventsError) {
+      throw new Error(missingPromotedEventsError.message)
+    }
+
+    const mergedEventRows = mergeOrganicAndPromotedRows(events ?? [], missingPromotedEvents ?? [])
+    const allEventIds = mergedEventRows.map((event) => event.id)
     const savedRestaurantIds = new Set(
       (savedRestaurants ?? []).map((restaurant) => restaurant.restaurant_id)
     )
@@ -246,7 +278,7 @@ export async function GET(request: Request) {
     }
 
     const visibleEvents = getVisibleEventsForSavedRestaurants({
-      events: events ?? [],
+      events: mergedEventRows,
       savedRestaurantIds,
       signups: allSignups ?? [],
       userId: user.id,
@@ -342,6 +374,12 @@ export async function GET(request: Request) {
     )
     const websiteUriByRestaurantId = new Map(
       (restaurantPlaces ?? []).map((restaurant) => [restaurant.id, restaurant.google_website_uri])
+    )
+    const ratingByRestaurantId = new Map(
+      (restaurantPlaces ?? []).map((restaurant) => [restaurant.id, restaurant.google_rating])
+    )
+    const reviewCountByRestaurantId = new Map(
+      (restaurantPlaces ?? []).map((restaurant) => [restaurant.id, restaurant.google_user_ratings_total])
     )
 
     const attendeeCountByEvent = new Map<number, number>()
@@ -450,11 +488,11 @@ export async function GET(request: Request) {
           google_reservable: event.google_reservable,
           google_review_count:
             event.restaurant_id !== null
-              ? (restaurantPlaces?.find((item) => item.id === event.restaurant_id)?.google_user_ratings_total ?? null)
+              ? (reviewCountByRestaurantId.get(event.restaurant_id) ?? null)
               : null,
           google_rating:
             event.restaurant_id !== null
-              ? (restaurantPlaces?.find((item) => item.id === event.restaurant_id)?.google_rating ?? null)
+              ? (ratingByRestaurantId.get(event.restaurant_id) ?? null)
               : null,
           google_serves_beer: event.google_serves_beer,
           google_serves_brunch: event.google_serves_brunch,
@@ -608,7 +646,7 @@ export async function GET(request: Request) {
     })
 
     return NextResponse.json({
-      events: mappedEvents,
+      events: attachPromotionPriorities(mappedEvents, resolvedPromotions),
       ok: true,
       onboardingRequired: false,
     })

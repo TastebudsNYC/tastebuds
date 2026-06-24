@@ -1870,6 +1870,13 @@ export default function AdminPage() {
                 >
                   Open event scheduler
                 </button>
+                <button
+                  className="rounded-xl border border-zinc-950 px-5 py-3 font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white"
+                  onClick={() => router.push('/admin/campaigns')}
+                  type="button"
+                >
+                  Open campaigns
+                </button>
               </div>
             </div>
 

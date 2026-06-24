@@ -1,3 +1,5 @@
+import type { PromotionPriorityBySurface } from '@/lib/advertising-ordering'
+
 export type Profile = {
   age_range_comfort: string[] | null
   bio: string | null
@@ -95,6 +97,7 @@ export type DashboardEvent = {
   personalMatchScore: number | null
   personalMatchSummary: string | null
   projectedRestaurantScore: number
+  promotionPriorities?: PromotionPriorityBySurface
   restaurant_cuisines: string[] | null
   restaurantGooglePlaceId: string | null
   restaurantWebsiteUri?: string | null
@@ -174,6 +177,7 @@ export type DashboardRestaurant = {
   isSaved: boolean
   matchTags: string[]
   matchScore: number
+  promotionPriorities?: PromotionPriorityBySurface
   menu_experience_tags?: string[] | null
   name: string
   neighbourhood: string | null
