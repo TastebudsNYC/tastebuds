@@ -15,6 +15,10 @@ type PromotableEntity = {
   promotionPriorities?: PromotionPriorityBySurface | null
 }
 
+type IdentifiedEntity = {
+  id: number
+}
+
 export function getRestaurantDiscoverySurfaces(input: {
   query: string
   selectedArea: string
@@ -34,7 +38,11 @@ export function getRestaurantDiscoverySurfaces(input: {
     surfaces.push('restaurant_neighbourhood')
   }
 
-  return surfaces.length > 0 ? surfaces : ['restaurant_recommendations']
+  return surfaces.length > 0 ? surfaces : ['restaurant_search']
+}
+
+export function getRestaurantRecommendationSurfaces(): readonly PromotionSurface[] {
+  return ['restaurant_recommendations']
 }
 
 export function getRestaurantPromotionDisclosure(input: {
@@ -97,4 +105,14 @@ export function compareEntitiesWithConditionalPromotion<T extends PromotableEnti
     organicCompare: input.organicCompare,
     surfaces: input.surfaces,
   })
+}
+
+export function compareEntitiesOrganically<T extends IdentifiedEntity>(
+  left: T,
+  right: T,
+  organicCompare: (left: T, right: T) => number
+) {
+  const organicOrder = organicCompare(left, right)
+
+  return organicOrder !== 0 ? organicOrder : left.id - right.id
 }

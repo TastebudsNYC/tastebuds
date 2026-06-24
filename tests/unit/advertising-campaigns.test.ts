@@ -71,6 +71,38 @@ describe('advertising campaign validation', () => {
     )
   })
 
+  it('rejects restaurant campaigns that only use deferred restaurant_recommendations on activation', () => {
+    const error = validateCampaignDraft({
+      campaignType: 'founding_partner',
+      endsOn: '2026-07-10',
+      eventId: null,
+      nextStatus: 'active',
+      promotionPriority: 0,
+      restaurantId: 7,
+      startsOn: '2026-07-01',
+      surfaces: ['restaurant_recommendations'],
+    })
+
+    expect(error).toBe(
+      'A campaign must have at least one currently live compatible surface before it can become active.'
+    )
+  })
+
+  it('allows activation when a restaurant campaign includes restaurant_search', () => {
+    const error = validateCampaignDraft({
+      campaignType: 'founding_partner',
+      endsOn: '2026-07-10',
+      eventId: null,
+      nextStatus: 'active',
+      promotionPriority: 0,
+      restaurantId: 7,
+      startsOn: '2026-07-01',
+      surfaces: ['restaurant_recommendations', 'restaurant_search'],
+    })
+
+    expect(error).toBeNull()
+  })
+
   it('allows activation when an event campaign includes the live event_list surface', () => {
     const error = validateCampaignDraft({
       campaignType: 'promoted_event',

@@ -5,10 +5,12 @@ import {
   getPromotionDisclosureForSurfaces,
 } from '@/lib/advertising-ordering'
 import {
+  compareEntitiesOrganically,
   compareEntitiesWithConditionalPromotion,
   getEventPromotionDisclosure,
   getRestaurantDiscoverySurfaces,
   getRestaurantPromotionDisclosure,
+  getRestaurantRecommendationSurfaces,
   isEventDiscoveryPlacementContext,
 } from '@/lib/advertising-display'
 import {
@@ -134,6 +136,62 @@ describe('advertising promotion helpers', () => {
     ])
   })
 
+  it('ignores deferred restaurant_recommendations metadata in the current consumer resolver', () => {
+    const resolved = buildResolvedPromotionRecords(
+      [
+        {
+          campaign_type: 'founding_partner',
+          id: 11,
+          promotion_campaign_surfaces: [{ surface: 'restaurant_recommendations' }],
+          promotion_priority: 8,
+          restaurant_id: 44,
+          starts_on: '2026-07-01',
+        },
+      ],
+      'restaurant'
+    )
+
+    expect(resolved).toEqual([])
+  })
+
+  it('still resolves live restaurant surfaces for current main-list placement', () => {
+    const resolved = buildResolvedPromotionRecords(
+      [
+        {
+          campaign_type: 'founding_partner',
+          id: 10,
+          promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
+          promotion_priority: 7,
+          restaurant_id: 44,
+          starts_on: '2026-07-01',
+        },
+        {
+          campaign_type: 'sponsored_listing',
+          id: 12,
+          promotion_campaign_surfaces: [{ surface: 'restaurant_category' }],
+          promotion_priority: 4,
+          restaurant_id: 44,
+          starts_on: '2026-07-02',
+        },
+      ],
+      'restaurant'
+    )
+
+    expect(resolved).toEqual([
+      {
+        promotionPriorities: {
+          restaurant_category: 4,
+          restaurant_search: 7,
+        },
+        promotionDisclosures: {
+          restaurant_category: 'Sponsored',
+          restaurant_search: 'Founding Partner',
+        },
+        targetId: 44,
+      },
+    ])
+  })
+
   it('merges organic and promoted candidates without duplicates', () => {
     expect(
       mergeOrganicAndPromotedRows(
@@ -233,14 +291,14 @@ describe('advertising promotion helpers', () => {
     ).toBeNull()
   })
 
-  it('uses search, category, neighbourhood, or recommendations based on the current restaurant discovery context', () => {
+  it('uses search, category, or neighbourhood surfaces for the main restaurant discovery context', () => {
     expect(
       getRestaurantDiscoverySurfaces({
         query: '',
         selectedArea: 'all',
         selectedCuisine: 'all',
       })
-    ).toEqual(['restaurant_recommendations'])
+    ).toEqual(['restaurant_search'])
 
     expect(
       getRestaurantDiscoverySurfaces({
@@ -257,6 +315,10 @@ describe('advertising promotion helpers', () => {
         selectedCuisine: 'Italian',
       })
     ).toEqual(['restaurant_category', 'restaurant_neighbourhood'])
+  })
+
+  it('keeps restaurant recommendations marked as a deferred recommendations-only surface', () => {
+    expect(getRestaurantRecommendationSurfaces()).toEqual(['restaurant_recommendations'])
   })
 
   it('suppresses restaurant disclosure in saved and watching while preserving it in an eligible discovery surface', () => {
@@ -285,6 +347,46 @@ describe('advertising promotion helpers', () => {
         surfaces: ['restaurant_recommendations'],
       })
     ).toBe('Founding Partner')
+  })
+
+  it('does not produce restaurant disclosure for deferred restaurant_recommendations in the current main list', () => {
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: false,
+        promotionDisclosures: {
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_recommendations: 9,
+        },
+        surfaces: ['restaurant_search'],
+      })
+    ).toBeNull()
+  })
+
+  it('keeps saved and watching organic even when saved restaurants carry promotion metadata', () => {
+    const sorted: RankedEntity[] = [
+      {
+        id: 1,
+        organicRank: 0,
+      },
+      {
+        id: 2,
+        organicRank: 1,
+        promotionDisclosures: {
+          restaurant_search: 'Sponsored' as const,
+        },
+        promotionPriorities: {
+          restaurant_search: 9,
+        },
+      },
+    ].sort((left, right) =>
+      compareEntitiesOrganically(left, right, (organicLeft, organicRight) =>
+        organicLeft.organicRank - organicRight.organicRank
+      )
+    )
+
+    expect(sorted.map((item) => item.id)).toEqual([1, 2])
   })
 
   it('does not disclose or reorder sponsorship in saved or joined event contexts', () => {
@@ -365,6 +467,46 @@ describe('advertising promotion helpers', () => {
         surfaces: ['restaurant_recommendations'],
       })
     ).toBe('Founding Partner')
+  })
+
+  it('uses the same winning applicable surface for restaurant ordering and disclosure', () => {
+    const candidate = {
+      id: 12,
+      organicRank: 1,
+      promotionDisclosures: {
+        restaurant_category: 'Founding Partner' as const,
+        restaurant_neighbourhood: 'Sponsored' as const,
+      },
+      promotionPriorities: {
+        restaurant_category: 4,
+        restaurant_neighbourhood: 7,
+      },
+    }
+
+    const competitor = {
+      id: 13,
+      organicRank: 0,
+      promotionDisclosures: null,
+      promotionPriorities: null,
+    }
+
+    const sorted = [candidate, competitor].sort((left, right) =>
+      compareEntitiesWithPromotion(left, right, {
+        organicCompare: (organicLeft, organicRight) =>
+          organicLeft.organicRank - organicRight.organicRank,
+        surfaces: ['restaurant_category', 'restaurant_neighbourhood'],
+      })
+    )
+
+    expect(sorted.map((item) => item.id)).toEqual([12, 13])
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: false,
+        promotionDisclosures: candidate.promotionDisclosures,
+        promotionPriorities: candidate.promotionPriorities,
+        surfaces: ['restaurant_category', 'restaurant_neighbourhood'],
+      })
+    ).toBe('Sponsored')
   })
 
   it('shows event disclosure only for the live event list surface', () => {

@@ -20,7 +20,11 @@ export const EVENT_SURFACES = [
 ] as const
 
 export const SURFACE_OPTIONS = [...RESTAURANT_SURFACES, ...EVENT_SURFACES] as const
-export const LIVE_RESTAURANT_SURFACES = [...RESTAURANT_SURFACES] as const
+export const LIVE_RESTAURANT_SURFACES = [
+  'restaurant_search',
+  'restaurant_category',
+  'restaurant_neighbourhood',
+] as const
 export const LIVE_EVENT_SURFACES = ['event_list'] as const
 export const LIVE_SURFACE_OPTIONS = [
   ...LIVE_RESTAURANT_SURFACES,

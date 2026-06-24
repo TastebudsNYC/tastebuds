@@ -14,6 +14,7 @@ import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { useToast } from '@/components/app/ToastProvider'
 import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
+  compareEntitiesOrganically,
   getRestaurantDiscoverySurfaces,
   getRestaurantPromotionDisclosure,
 } from '@/lib/advertising-display'
@@ -606,10 +607,12 @@ export default function RestaurantsPage() {
       visibleRestaurants
         .filter((restaurant) => restaurant.isSaved)
         .sort((left, right) =>
-          compareRestaurantsOrganically(left, right, {
-            activeTune,
-            showLiveOnly,
-          })
+          compareEntitiesOrganically(left, right, (organicLeft, organicRight) =>
+            compareRestaurantsOrganically(organicLeft, organicRight, {
+              activeTune,
+              showLiveOnly,
+            })
+          )
         ),
     [activeTune, showLiveOnly, visibleRestaurants]
   )
@@ -773,7 +776,7 @@ export default function RestaurantsPage() {
                 <section className="space-y-4">
                   <div>
                     <h2 className="text-2xl font-black tracking-tight text-[color:var(--foreground)]">
-                      Recommended for you
+                      Your matches
                     </h2>
                     <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
                       Matches ranked for the kind of night you actually want.

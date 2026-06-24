@@ -644,6 +644,86 @@ describe('admin campaigns route', () => {
     )
   })
 
+  it('blocks activation when a restaurant campaign only has deferred restaurant_recommendations configured', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'draft',
+      },
+      currentSurfaces: ['restaurant_recommendations'],
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'activate', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(payload.error).toBe(
+      'A campaign must have at least one currently live compatible surface before it can become active.'
+    )
+    expect(adminClient.rpc).not.toHaveBeenCalled()
+  })
+
+  it('allows activation when a restaurant campaign includes the live restaurant_search surface', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'draft',
+      },
+      currentSurfaces: ['restaurant_recommendations', 'restaurant_search'],
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'activate', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'activate',
+        p_campaign_id: 1,
+        p_campaign_type: 'founding_partner',
+        p_surfaces: ['restaurant_recommendations', 'restaurant_search'],
+      })
+    )
+  })
+
   it('returns a safe 500 when a lifecycle mutation RPC transport error occurs', async () => {
     requireAdminOrCronMock.mockResolvedValue({
       kind: 'admin',
