@@ -173,6 +173,155 @@ describe('admin campaigns route', () => {
     expect(adminClient.promotionCampaignSurfaceDelete).not.toHaveBeenCalled()
   })
 
+  it('does not revalidate an archived target when pausing an active campaign', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'active',
+      },
+      currentSurfaces: ['restaurant_search'],
+      restaurantLookup: { archived_at: '2026-06-24T12:00:00Z', id: 5, name: 'Restaurant' },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'pause', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'pause',
+        p_campaign_id: 1,
+      })
+    )
+  })
+
+  it('does not revalidate an archived target when ending an active campaign', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'active',
+      },
+      currentSurfaces: ['restaurant_search'],
+      restaurantLookup: { archived_at: '2026-06-24T12:00:00Z', id: 5, name: 'Restaurant' },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'end', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'end',
+        p_campaign_id: 1,
+      })
+    )
+  })
+
+  it('does not revalidate an archived target when deleting a draft campaign', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: { status: 'draft' },
+      currentSurfaces: ['restaurant_search'],
+      restaurantLookup: { archived_at: '2026-06-24T12:00:00Z', id: 5, name: 'Restaurant' },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.DELETE(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ campaignId: 1 }),
+        method: 'DELETE',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'delete',
+        p_campaign_id: 1,
+      })
+    )
+  })
+
+  it('rejects reactivation when the target has since been archived', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'paused',
+      },
+      currentSurfaces: ['restaurant_search'],
+      restaurantLookup: { archived_at: '2026-06-24T12:00:00Z', id: 5, name: 'Restaurant' },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'reactivate', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(payload.error).toBe('Archived restaurants cannot be used as active campaign targets.')
+    expect(adminClient.rpc).not.toHaveBeenCalled()
+  })
+
   it('blocks activation when a draft campaign has zero configured surfaces', async () => {
     requireAdminOrCronMock.mockResolvedValue({
       kind: 'admin',

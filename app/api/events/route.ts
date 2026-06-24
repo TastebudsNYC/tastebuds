@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import {
-  attachPromotionPriorities,
+  attachPromotionMetadata,
   mergeOrganicAndPromotedRows,
   resolveActivePromotionRecords,
 } from '@/lib/advertising-resolver'
@@ -646,7 +646,7 @@ export async function GET(request: Request) {
     })
 
     return NextResponse.json({
-      events: attachPromotionPriorities(mappedEvents, resolvedPromotions),
+      events: attachPromotionMetadata(mappedEvents, resolvedPromotions),
       ok: true,
       onboardingRequired: false,
     })

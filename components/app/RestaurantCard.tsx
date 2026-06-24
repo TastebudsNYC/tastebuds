@@ -108,6 +108,7 @@ export function RestaurantCard({
   onHighlightChange,
   onOpenDetails,
   onToggleSaved,
+  promotionDisclosure,
   restaurant,
   saving,
 }: {
@@ -116,6 +117,7 @@ export function RestaurantCard({
   onHighlightChange?: (restaurantId: number | null) => void
   onOpenDetails?: (restaurant: DashboardRestaurant) => void
   onToggleSaved?: (restaurantId: number, action: 'save' | 'unsave') => void
+  promotionDisclosure?: 'Founding Partner' | 'Sponsored' | null
   restaurant: DashboardRestaurant
   saving?: boolean
 }) {
@@ -169,6 +171,11 @@ export function RestaurantCard({
               {metadataItems.length > 0 ? (
                 <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
                   {metadataItems.join(' / ')}
+                </p>
+              ) : null}
+              {promotionDisclosure ? (
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                  {promotionDisclosure}
                 </p>
               ) : null}
             </div>

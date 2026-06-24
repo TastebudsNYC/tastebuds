@@ -390,6 +390,7 @@ export function EventCard({
   onSetDayOfConfirmation,
   onSetEventSignup,
   onSubmitFeedback,
+  promotionDisclosure,
   similarEvents = [],
   showDetails = false,
   withinModal = false,
@@ -407,6 +408,7 @@ export function EventCard({
   onSetDayOfConfirmation?: (action: 'confirm' | 'decline') => void
   onSetEventSignup?: (action: 'join' | 'leave') => void
   onSubmitFeedback?: () => void
+  promotionDisclosure?: 'Founding Partner' | 'Sponsored' | null
   similarEvents?: DashboardEvent[]
   showDetails?: boolean
   withinModal?: boolean
@@ -494,6 +496,11 @@ export function EventCard({
           ) : metadataItems.length > 0 ? (
             <p className="mt-2 text-sm leading-6 text-[color:var(--text-secondary)]">
               {metadataItems.join(' / ')}
+            </p>
+          ) : null}
+          {!showDetails && promotionDisclosure ? (
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+              {promotionDisclosure}
             </p>
           ) : null}
           <p className="mt-2 text-sm text-[color:var(--text-muted)]">{getShortEventWindow(event)}</p>

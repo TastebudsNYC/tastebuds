@@ -13,7 +13,10 @@ import { EventJoinConfirmModal } from '@/components/app/EventJoinConfirmModal'
 import { AppPageSkeleton } from '@/components/app/LoadingSkeleton'
 import { PageHeader } from '@/components/app/PageHeader'
 import { useToast } from '@/components/app/ToastProvider'
-import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
+import {
+  compareEntitiesWithPromotion,
+  getPromotionDisclosureForSurfaces,
+} from '@/lib/advertising-ordering'
 import {
   fetchEvents,
   fetchNotifications,
@@ -713,6 +716,11 @@ export default function EventsPage() {
 
                     void handleEventSignup(event.id, action)
                   }}
+                  promotionDisclosure={getPromotionDisclosureForSurfaces(
+                    event.promotionPriorities,
+                    event.promotionDisclosures,
+                    ['event_list']
+                  )}
                 />
               ))
             ) : (
@@ -803,6 +811,11 @@ export default function EventsPage() {
 
                       void handleEventSignup(event.id, action)
                     }}
+                    promotionDisclosure={getPromotionDisclosureForSurfaces(
+                      event.promotionPriorities,
+                      event.promotionDisclosures,
+                      ['event_list']
+                    )}
                   />
                 ))}
               </div>

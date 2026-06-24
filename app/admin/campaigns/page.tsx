@@ -16,6 +16,10 @@ import {
   LIVE_RESTAURANT_SURFACES,
   RESTAURANT_SURFACES,
 } from '@/lib/advertising'
+import {
+  getDefaultCampaignEndDate,
+  getDefaultCampaignStartDate,
+} from '@/lib/advertising-dates'
 import { supabase } from '@/lib/supabase/client'
 
 type AdminCampaign = {
@@ -129,14 +133,6 @@ function SurfacePicker({
   )
 }
 
-function getDefaultStartDate() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getDefaultEndDate() {
-  return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-}
-
 export default function AdminCampaignsPage() {
   const router = useRouter()
   const [campaigns, setCampaigns] = useState<AdminCampaign[]>([])
@@ -155,8 +151,8 @@ export default function AdminCampaignsPage() {
   const [campaignType, setCampaignType] = useState<CampaignType>('founding_partner')
   const [restaurantId, setRestaurantId] = useState('')
   const [eventId, setEventId] = useState('')
-  const [startsOn, setStartsOn] = useState(getDefaultStartDate())
-  const [endsOn, setEndsOn] = useState(getDefaultEndDate())
+  const [startsOn, setStartsOn] = useState(() => getDefaultCampaignStartDate())
+  const [endsOn, setEndsOn] = useState(() => getDefaultCampaignEndDate())
   const [promotionPriority, setPromotionPriority] = useState('0')
   const [surfaces, setSurfaces] = useState<PromotionSurface[]>([])
   const [internalNotes, setInternalNotes] = useState('')
@@ -258,8 +254,8 @@ export default function AdminCampaignsPage() {
     setCampaignType('founding_partner')
     setRestaurantId('')
     setEventId('')
-    setStartsOn(getDefaultStartDate())
-    setEndsOn(getDefaultEndDate())
+    setStartsOn(getDefaultCampaignStartDate())
+    setEndsOn(getDefaultCampaignEndDate())
     setPromotionPriority('0')
     setSurfaces([])
     setInternalNotes('')

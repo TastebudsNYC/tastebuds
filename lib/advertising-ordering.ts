@@ -1,13 +1,16 @@
 import type { PromotionSurface } from '@/lib/advertising'
 
 type PromotionPriorityBySurface = Partial<Record<PromotionSurface, number>>
+type PromotionDisclosure = 'Founding Partner' | 'Sponsored'
+type PromotionDisclosureBySurface = Partial<Record<PromotionSurface, PromotionDisclosure>>
 
 type PromotableEntity = {
   id: number
+  promotionDisclosures?: PromotionDisclosureBySurface | null
   promotionPriorities?: PromotionPriorityBySurface | null
 }
 
-export type { PromotionPriorityBySurface }
+export type { PromotionDisclosure, PromotionDisclosureBySurface, PromotionPriorityBySurface }
 
 export function getHighestPromotionPriority(
   priorities: PromotionPriorityBySurface | null | undefined,
@@ -62,4 +65,29 @@ export function compareEntitiesWithPromotion<T extends PromotableEntity>(
   }
 
   return left.id - right.id
+}
+
+export function getPromotionDisclosureForSurfaces(
+  priorities: PromotionPriorityBySurface | null | undefined,
+  disclosures: PromotionDisclosureBySurface | null | undefined,
+  surfaces: readonly PromotionSurface[]
+) {
+  let bestDisclosure: PromotionDisclosure | null = null
+  let bestPriority: number | null = null
+
+  for (const surface of surfaces) {
+    const disclosure = disclosures?.[surface]
+    const priority = priorities?.[surface]
+
+    if (!disclosure || typeof priority !== 'number') {
+      continue
+    }
+
+    if (bestPriority === null || priority > bestPriority) {
+      bestPriority = priority
+      bestDisclosure = disclosure
+    }
+  }
+
+  return bestDisclosure
 }

@@ -92,6 +92,15 @@ class CampaignMutationRpcError extends Error {
   }
 }
 
+function shouldValidateActiveCampaignTarget(action: CampaignWriteAction | 'create') {
+  return (
+    action === 'create' ||
+    action === 'update' ||
+    action === 'activate' ||
+    action === 'reactivate'
+  )
+}
+
 function getSafeCampaignMutationErrorMessage(error: CampaignMutationRpcError) {
   const normalizedMessage = error.message.toLowerCase()
 
@@ -368,10 +377,12 @@ export async function POST(request: Request) {
   try {
     const adminClient = createServerSupabaseAdminClient()
 
-    if (campaignType === 'promoted_event') {
-      await fetchEventTarget(adminClient, eventId as number)
-    } else {
-      await fetchRestaurantTarget(adminClient, restaurantId as number)
+    if (shouldValidateActiveCampaignTarget('create')) {
+      if (campaignType === 'promoted_event') {
+        await fetchEventTarget(adminClient, eventId as number)
+      } else {
+        await fetchRestaurantTarget(adminClient, restaurantId as number)
+      }
     }
 
     const actorId = adminCheck.kind === 'admin' ? adminCheck.user.id : null
@@ -557,10 +568,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    if (campaignType === 'promoted_event') {
-      await fetchEventTarget(adminClient, eventId as number)
-    } else {
-      await fetchRestaurantTarget(adminClient, restaurantId as number)
+    if (shouldValidateActiveCampaignTarget(action)) {
+      if (campaignType === 'promoted_event') {
+        await fetchEventTarget(adminClient, eventId as number)
+      } else {
+        await fetchRestaurantTarget(adminClient, restaurantId as number)
+      }
     }
 
     const actorId = adminCheck.kind === 'admin' ? adminCheck.user.id : null

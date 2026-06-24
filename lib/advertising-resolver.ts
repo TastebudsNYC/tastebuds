@@ -4,10 +4,13 @@ import {
   LIVE_EVENT_SURFACES,
   LIVE_RESTAURANT_SURFACES,
 } from '@/lib/advertising'
-import type { PromotionPriorityBySurface } from '@/lib/advertising-ordering'
+import { getCurrentDateKeyInNewYork } from '@/lib/advertising-dates'
+import type {
+  PromotionDisclosure,
+  PromotionDisclosureBySurface,
+  PromotionPriorityBySurface,
+} from '@/lib/advertising-ordering'
 import { createServerSupabaseAdminClient } from '@/lib/supabase/server'
-
-const NEW_YORK_TIMEZONE = 'America/New_York'
 
 type EntityType = 'event' | 'restaurant'
 
@@ -16,6 +19,7 @@ type CampaignSurfaceRow = {
 }
 
 type PromotionCampaignRow = {
+  campaign_type: 'founding_partner' | 'promoted_event' | 'sponsored_listing'
   id: number
   promotion_campaign_surfaces: CampaignSurfaceRow[] | null
   promotion_priority: number
@@ -25,36 +29,26 @@ type PromotionCampaignRow = {
 }
 
 type ResolvedPromotionRecord = {
+  promotionDisclosures: PromotionDisclosureBySurface
   targetId: number
   promotionPriorities: PromotionPriorityBySurface
-}
-
-export function getCurrentDateKeyInNewYork(reference: Date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: NEW_YORK_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(reference)
-  const year = parts.find((part) => part.type === 'year')?.value
-  const month = parts.find((part) => part.type === 'month')?.value
-  const day = parts.find((part) => part.type === 'day')?.value
-
-  if (!year || !month || !day) {
-    throw new Error('Failed to derive New York campaign date.')
-  }
-
-  return `${year}-${month}-${day}`
 }
 
 function getLiveSurfacesForEntity(entityType: EntityType) {
   return entityType === 'event' ? LIVE_EVENT_SURFACES : LIVE_RESTAURANT_SURFACES
 }
 
+function getPromotionDisclosureForCampaignType(
+  campaignType: PromotionCampaignRow['campaign_type']
+): PromotionDisclosure {
+  return campaignType === 'founding_partner' ? 'Founding Partner' : 'Sponsored'
+}
+
 export function buildResolvedPromotionRecords(
   campaigns: PromotionCampaignRow[],
   entityType: EntityType
 ) {
+  const campaignTypeById = new Map(campaigns.map((campaign) => [campaign.id, campaign.campaign_type] as const))
   const winnerByTargetAndSurface = new Map<string, {
     campaignId: number
     priority: number
@@ -102,15 +96,23 @@ export function buildResolvedPromotionRecords(
   }
 
   const prioritiesByTargetId = new Map<number, PromotionPriorityBySurface>()
+  const disclosuresByTargetId = new Map<number, PromotionDisclosureBySurface>()
 
   for (const winner of winnerByTargetAndSurface.values()) {
     prioritiesByTargetId.set(winner.targetId, {
       ...(prioritiesByTargetId.get(winner.targetId) ?? {}),
       [winner.surface]: winner.priority,
     })
+    disclosuresByTargetId.set(winner.targetId, {
+      ...(disclosuresByTargetId.get(winner.targetId) ?? {}),
+      [winner.surface]: getPromotionDisclosureForCampaignType(
+        campaignTypeById.get(winner.campaignId) ?? 'sponsored_listing'
+      ),
+    })
   }
 
   return Array.from(prioritiesByTargetId.entries()).map(([targetId, promotionPriorities]) => ({
+    promotionDisclosures: disclosuresByTargetId.get(targetId) ?? {},
     promotionPriorities,
     targetId,
   })) satisfies ResolvedPromotionRecord[]
@@ -135,21 +137,20 @@ export function mergeOrganicAndPromotedRows<T extends { id: number }>(
   return Array.from(rowById.values())
 }
 
-export function attachPromotionPriorities<T extends { id: number }>(
+export function attachPromotionMetadata<T extends { id: number }>(
   rows: T[],
   resolvedPromotions: ResolvedPromotionRecord[]
 ) {
-  const promotionByTargetId = new Map(
-    resolvedPromotions.map((record) => [record.targetId, record.promotionPriorities] as const)
-  )
+  const promotionByTargetId = new Map(resolvedPromotions.map((record) => [record.targetId, record] as const))
 
   return rows.map((row) => {
-    const promotionPriorities = promotionByTargetId.get(row.id)
+    const promotion = promotionByTargetId.get(row.id)
 
-    return promotionPriorities
+    return promotion
       ? {
           ...row,
-          promotionPriorities,
+          promotionDisclosures: promotion.promotionDisclosures,
+          promotionPriorities: promotion.promotionPriorities,
         }
       : row
   })
@@ -166,13 +167,13 @@ export async function resolveActivePromotionRecords(
       ? adminClient
           .from('promotion_campaigns')
           .select(
-            'event_id, id, promotion_campaign_surfaces!inner(surface), promotion_priority, starts_on'
+            'campaign_type, event_id, id, promotion_campaign_surfaces!inner(surface), promotion_priority, starts_on'
           )
           .not('event_id', 'is', null)
       : adminClient
           .from('promotion_campaigns')
           .select(
-            'id, promotion_campaign_surfaces!inner(surface), promotion_priority, restaurant_id, starts_on'
+            'campaign_type, id, promotion_campaign_surfaces!inner(surface), promotion_priority, restaurant_id, starts_on'
           )
           .not('restaurant_id', 'is', null)
 

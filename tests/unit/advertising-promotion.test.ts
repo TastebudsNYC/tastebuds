@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
-import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
-  attachPromotionPriorities,
+  compareEntitiesWithPromotion,
+  getPromotionDisclosureForSurfaces,
+} from '@/lib/advertising-ordering'
+import {
+  attachPromotionMetadata,
   buildResolvedPromotionRecords,
-  getCurrentDateKeyInNewYork,
   mergeOrganicAndPromotedRows,
 } from '@/lib/advertising-resolver'
+import {
+  getCurrentDateKeyInNewYork,
+  getDefaultCampaignEndDate,
+  getDefaultCampaignStartDate,
+} from '@/lib/advertising-dates'
 
 type RankedEntity = {
   id: number
@@ -20,6 +27,15 @@ type RankedEntity = {
     restaurant_recommendations?: number
     restaurant_search?: number
   } | null
+  promotionDisclosures?: {
+    event_explore?: 'Founding Partner' | 'Sponsored'
+    event_list?: 'Founding Partner' | 'Sponsored'
+    event_recommendations?: 'Founding Partner' | 'Sponsored'
+    restaurant_category?: 'Founding Partner' | 'Sponsored'
+    restaurant_neighbourhood?: 'Founding Partner' | 'Sponsored'
+    restaurant_recommendations?: 'Founding Partner' | 'Sponsored'
+    restaurant_search?: 'Founding Partner' | 'Sponsored'
+  } | null
 }
 
 describe('advertising promotion helpers', () => {
@@ -27,6 +43,7 @@ describe('advertising promotion helpers', () => {
     const resolved = buildResolvedPromotionRecords(
       [
         {
+          campaign_type: 'sponsored_listing',
           id: 12,
           promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
           promotion_priority: 3,
@@ -34,6 +51,7 @@ describe('advertising promotion helpers', () => {
           starts_on: '2026-07-05',
         },
         {
+          campaign_type: 'founding_partner',
           id: 8,
           promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
           promotion_priority: 3,
@@ -41,6 +59,7 @@ describe('advertising promotion helpers', () => {
           starts_on: '2026-07-01',
         },
         {
+          campaign_type: 'sponsored_listing',
           id: 6,
           promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
           promotion_priority: 5,
@@ -56,6 +75,9 @@ describe('advertising promotion helpers', () => {
         promotionPriorities: {
           restaurant_search: 5,
         },
+        promotionDisclosures: {
+          restaurant_search: 'Sponsored',
+        },
         targetId: 44,
       },
     ])
@@ -65,6 +87,7 @@ describe('advertising promotion helpers', () => {
     const resolved = buildResolvedPromotionRecords(
       [
         {
+          campaign_type: 'promoted_event',
           event_id: 91,
           id: 4,
           promotion_campaign_surfaces: [
@@ -75,6 +98,7 @@ describe('advertising promotion helpers', () => {
           starts_on: '2026-07-01',
         },
         {
+          campaign_type: 'promoted_event',
           event_id: 91,
           id: 5,
           promotion_campaign_surfaces: [{ surface: 'event_list' }],
@@ -89,6 +113,9 @@ describe('advertising promotion helpers', () => {
       {
         promotionPriorities: {
           event_list: 4,
+        },
+        promotionDisclosures: {
+          event_list: 'Sponsored',
         },
         targetId: 91,
       },
@@ -109,21 +136,31 @@ describe('advertising promotion helpers', () => {
   })
 
   it('attaches only consumer-safe promotion priority metadata', () => {
-    const rows = attachPromotionPriorities(
+    const rows = attachPromotionMetadata(
       [{ id: 7, name: 'Venue' }],
-      [{ promotionPriorities: { restaurant_search: 6 }, targetId: 7 }]
+      [
+        {
+          promotionDisclosures: { restaurant_search: 'Sponsored' },
+          promotionPriorities: { restaurant_search: 6 },
+          targetId: 7,
+        },
+      ]
     )
 
     expect(rows).toEqual([
       {
         id: 7,
         name: 'Venue',
+        promotionDisclosures: {
+          restaurant_search: 'Sponsored',
+        },
         promotionPriorities: {
           restaurant_search: 6,
         },
       },
     ])
     expect(JSON.stringify(rows)).not.toContain('campaign_id')
+    expect(JSON.stringify(rows)).not.toContain('campaign_type')
     expect(JSON.stringify(rows)).not.toContain('internal_notes')
     expect(JSON.stringify(rows)).not.toContain('campaignStatus')
     expect(JSON.stringify(rows)).not.toContain('campaignStartsOn')
@@ -133,6 +170,55 @@ describe('advertising promotion helpers', () => {
   it('derives the active campaign date from the New York calendar near UTC midnight', () => {
     expect(getCurrentDateKeyInNewYork(new Date('2026-07-01T00:30:00.000Z'))).toBe('2026-06-30')
     expect(getCurrentDateKeyInNewYork(new Date('2026-07-01T04:30:00.000Z'))).toBe('2026-07-01')
+  })
+
+  it('derives New York campaign form defaults near a UTC date boundary', () => {
+    const reference = new Date('2026-07-01T00:30:00.000Z')
+
+    expect(getDefaultCampaignStartDate(reference)).toBe('2026-06-30')
+    expect(getDefaultCampaignEndDate(reference)).toBe('2026-07-14')
+  })
+
+  it('returns Sponsored only for an applicable sponsored current surface', () => {
+    expect(
+      getPromotionDisclosureForSurfaces(
+        {
+          restaurant_category: 3,
+          restaurant_search: 7,
+        },
+        {
+          restaurant_category: 'Founding Partner',
+          restaurant_search: 'Sponsored',
+        },
+        ['restaurant_search']
+      )
+    ).toBe('Sponsored')
+  })
+
+  it('returns Founding Partner only for an applicable founding-partner current surface', () => {
+    expect(
+      getPromotionDisclosureForSurfaces(
+        {
+          restaurant_recommendations: 8,
+          restaurant_search: 2,
+        },
+        {
+          restaurant_recommendations: 'Founding Partner',
+          restaurant_search: 'Sponsored',
+        },
+        ['restaurant_recommendations']
+      )
+    ).toBe('Founding Partner')
+  })
+
+  it('returns no disclosure for wrong-surface or inactive metadata', () => {
+    expect(
+      getPromotionDisclosureForSurfaces(
+        { restaurant_search: 5 },
+        { restaurant_search: 'Sponsored' },
+        ['restaurant_category']
+      )
+    ).toBeNull()
   })
 
   it('preserves exact organic ordering when no promotion applies', () => {
