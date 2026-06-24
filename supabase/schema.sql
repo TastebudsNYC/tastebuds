@@ -799,10 +799,10 @@ begin
       return;
     end if;
 
-    select coalesce(array_agg(surface order by surface), '{}'::text[])
+    select coalesce(array_agg(pcs.surface order by pcs.surface), '{}'::text[])
     into v_current_surfaces
-    from public.promotion_campaign_surfaces
-    where campaign_id = v_current.id;
+    from public.promotion_campaign_surfaces as pcs
+    where pcs.campaign_id = v_current.id;
   end if;
 
   if p_action = 'create' then
@@ -834,8 +834,8 @@ begin
 
     select exists (
       select 1
-      from public.promotion_campaign_daily_reports
-      where campaign_id = v_current.id
+      from public.promotion_campaign_daily_reports as pcdr
+      where pcdr.campaign_id = v_current.id
     )
     into v_has_reporting_data;
 
@@ -1142,9 +1142,9 @@ begin
       updated_by = p_actor_id
   where id = v_current.id;
 
-  delete from public.promotion_campaign_surfaces
-  where campaign_id = v_current.id
-    and not (surface = any(v_next_surfaces));
+  delete from public.promotion_campaign_surfaces as pcs
+  where pcs.campaign_id = v_current.id
+    and not (pcs.surface = any(v_next_surfaces));
 
   insert into public.promotion_campaign_surfaces (campaign_id, surface)
   select v_current.id, surface_value

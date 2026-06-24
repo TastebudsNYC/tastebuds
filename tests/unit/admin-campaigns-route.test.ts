@@ -590,4 +590,16 @@ describe('admin campaigns route', () => {
     )
     expect(migrationSql).toContain("where surface_value = 'event_list'")
   })
+
+  it('qualifies campaign_id references in the follow-up mutation fix migration', () => {
+    const migrationSql = readFileSync(
+      'supabase/migrations/202606240003_fix_campaign_mutation_column_qualification.sql',
+      'utf8'
+    )
+
+    expect(migrationSql).toContain('where pcs.campaign_id = v_current.id;')
+    expect(migrationSql).toContain('where pcdr.campaign_id = v_current.id')
+    expect(migrationSql).toContain('delete from public.promotion_campaign_surfaces as pcs')
+    expect(migrationSql).toContain('and not (pcs.surface = any(v_next_surfaces));')
+  })
 })
