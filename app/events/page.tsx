@@ -14,9 +14,10 @@ import { AppPageSkeleton } from '@/components/app/LoadingSkeleton'
 import { PageHeader } from '@/components/app/PageHeader'
 import { useToast } from '@/components/app/ToastProvider'
 import {
-  compareEntitiesWithPromotion,
-  getPromotionDisclosureForSurfaces,
-} from '@/lib/advertising-ordering'
+  compareEntitiesWithConditionalPromotion,
+  getEventPromotionDisclosure,
+  isEventDiscoveryPlacementContext,
+} from '@/lib/advertising-display'
 import {
   fetchEvents,
   fetchNotifications,
@@ -428,7 +429,12 @@ export default function EventsPage() {
       )
       .filter((event) => matchesEventTravelFilter(event, profile, selectedTravel))
       .sort((left, right) =>
-        compareEntitiesWithPromotion(left, right, {
+        compareEntitiesWithConditionalPromotion(left, right, {
+          isPromotionEligible: (candidate) =>
+            isEventDiscoveryPlacementContext({
+              hasEnded: candidate.hasEnded,
+              isJoined: candidate.isJoined,
+            }),
           organicCompare: (organicLeft, organicRight) =>
             compareEventsOrganically(organicLeft, organicRight, sortBy),
           surfaces: ['event_list'],
@@ -716,11 +722,12 @@ export default function EventsPage() {
 
                     void handleEventSignup(event.id, action)
                   }}
-                  promotionDisclosure={getPromotionDisclosureForSurfaces(
-                    event.promotionPriorities,
-                    event.promotionDisclosures,
-                    ['event_list']
-                  )}
+                  promotionDisclosure={getEventPromotionDisclosure({
+                    hasEnded: event.hasEnded,
+                    isJoined: event.isJoined,
+                    promotionDisclosures: event.promotionDisclosures,
+                    promotionPriorities: event.promotionPriorities,
+                  })}
                 />
               ))
             ) : (
@@ -811,11 +818,7 @@ export default function EventsPage() {
 
                       void handleEventSignup(event.id, action)
                     }}
-                    promotionDisclosure={getPromotionDisclosureForSurfaces(
-                      event.promotionPriorities,
-                      event.promotionDisclosures,
-                      ['event_list']
-                    )}
+                    promotionDisclosure={null}
                   />
                 ))}
               </div>

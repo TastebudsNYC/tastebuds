@@ -5,6 +5,13 @@ import {
   getPromotionDisclosureForSurfaces,
 } from '@/lib/advertising-ordering'
 import {
+  compareEntitiesWithConditionalPromotion,
+  getEventPromotionDisclosure,
+  getRestaurantDiscoverySurfaces,
+  getRestaurantPromotionDisclosure,
+  isEventDiscoveryPlacementContext,
+} from '@/lib/advertising-display'
+import {
   attachPromotionMetadata,
   buildResolvedPromotionRecords,
   mergeOrganicAndPromotedRows,
@@ -36,6 +43,11 @@ type RankedEntity = {
     restaurant_recommendations?: 'Founding Partner' | 'Sponsored'
     restaurant_search?: 'Founding Partner' | 'Sponsored'
   } | null
+}
+
+type RankedEventLike = RankedEntity & {
+  hasEnded: boolean
+  isJoined: boolean
 }
 
 describe('advertising promotion helpers', () => {
@@ -218,6 +230,185 @@ describe('advertising promotion helpers', () => {
         { restaurant_search: 'Sponsored' },
         ['restaurant_category']
       )
+    ).toBeNull()
+  })
+
+  it('uses search, category, neighbourhood, or recommendations based on the current restaurant discovery context', () => {
+    expect(
+      getRestaurantDiscoverySurfaces({
+        query: '',
+        selectedArea: 'all',
+        selectedCuisine: 'all',
+      })
+    ).toEqual(['restaurant_recommendations'])
+
+    expect(
+      getRestaurantDiscoverySurfaces({
+        query: 'pizza',
+        selectedArea: 'all',
+        selectedCuisine: 'all',
+      })
+    ).toEqual(['restaurant_search'])
+
+    expect(
+      getRestaurantDiscoverySurfaces({
+        query: '',
+        selectedArea: 'Soho',
+        selectedCuisine: 'Italian',
+      })
+    ).toEqual(['restaurant_category', 'restaurant_neighbourhood'])
+  })
+
+  it('suppresses restaurant disclosure in saved and watching while preserving it in an eligible discovery surface', () => {
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: true,
+        promotionDisclosures: {
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_recommendations: 9,
+        },
+        surfaces: ['restaurant_recommendations'],
+      })
+    ).toBeNull()
+
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: false,
+        promotionDisclosures: {
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_recommendations: 9,
+        },
+        surfaces: ['restaurant_recommendations'],
+      })
+    ).toBe('Founding Partner')
+  })
+
+  it('does not disclose or reorder sponsorship in saved or joined event contexts', () => {
+    const organicFirst: RankedEventLike = {
+      hasEnded: false,
+      id: 1,
+      isJoined: false,
+      organicRank: 0,
+    }
+    const sponsoredJoinedEvent: RankedEventLike = {
+      hasEnded: false,
+      id: 2,
+      isJoined: true,
+      organicRank: 1,
+      promotionDisclosures: {
+        event_list: 'Sponsored',
+      },
+      promotionPriorities: {
+        event_list: 8,
+      },
+    }
+
+    const sorted = [sponsoredJoinedEvent, organicFirst].sort((left, right) =>
+      compareEntitiesWithConditionalPromotion(left, right, {
+        isPromotionEligible: (candidate) =>
+          isEventDiscoveryPlacementContext({
+            hasEnded: candidate.hasEnded,
+            isJoined: candidate.isJoined,
+          }),
+        organicCompare: (organicLeft, organicRight) =>
+          organicLeft.organicRank - organicRight.organicRank,
+        surfaces: ['event_list'],
+      })
+    )
+
+    expect(sorted.map((item) => item.id)).toEqual([1, 2])
+    expect(
+      getEventPromotionDisclosure({
+        hasEnded: false,
+        isJoined: true,
+        promotionDisclosures: {
+          event_list: 'Sponsored',
+        },
+        promotionPriorities: {
+          event_list: 8,
+        },
+      })
+    ).toBeNull()
+  })
+
+  it('shows restaurant disclosure only for the applicable current surface', () => {
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: false,
+        promotionDisclosures: {
+          restaurant_category: 'Sponsored',
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_category: 6,
+          restaurant_recommendations: 8,
+        },
+        surfaces: ['restaurant_category'],
+      })
+    ).toBe('Sponsored')
+
+    expect(
+      getRestaurantPromotionDisclosure({
+        isSaved: false,
+        promotionDisclosures: {
+          restaurant_category: 'Sponsored',
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_category: 6,
+          restaurant_recommendations: 8,
+        },
+        surfaces: ['restaurant_recommendations'],
+      })
+    ).toBe('Founding Partner')
+  })
+
+  it('shows event disclosure only for the live event list surface', () => {
+    expect(
+      getEventPromotionDisclosure({
+        hasEnded: false,
+        isJoined: false,
+        promotionDisclosures: {
+          event_explore: 'Sponsored',
+          event_list: 'Sponsored',
+        },
+        promotionPriorities: {
+          event_explore: 10,
+          event_list: 4,
+        },
+      })
+    ).toBe('Sponsored')
+
+    expect(
+      getEventPromotionDisclosure({
+        hasEnded: false,
+        isJoined: false,
+        promotionDisclosures: {
+          event_explore: 'Sponsored',
+        },
+        promotionPriorities: {
+          event_explore: 10,
+        },
+      })
+    ).toBeNull()
+  })
+
+  it('suppresses disclosure for past, wrong-surface, and non-discovery event contexts', () => {
+    expect(
+      getEventPromotionDisclosure({
+        hasEnded: true,
+        isJoined: false,
+        promotionDisclosures: {
+          event_list: 'Sponsored',
+        },
+        promotionPriorities: {
+          event_list: 5,
+        },
+      })
     ).toBeNull()
   })
 

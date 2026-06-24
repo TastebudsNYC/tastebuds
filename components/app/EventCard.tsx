@@ -499,7 +499,7 @@ export function EventCard({
             </p>
           ) : null}
           {!showDetails && promotionDisclosure ? (
-            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+            <p className="mt-3 text-sm font-semibold tracking-[0.06em] text-[color:var(--foreground)]/78">
               {promotionDisclosure}
             </p>
           ) : null}

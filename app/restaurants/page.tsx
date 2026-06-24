@@ -12,10 +12,11 @@ import { PageHeader } from '@/components/app/PageHeader'
 import { RestaurantCard } from '@/components/app/RestaurantCard'
 import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { useToast } from '@/components/app/ToastProvider'
+import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
-  compareEntitiesWithPromotion,
-  getPromotionDisclosureForSurfaces,
-} from '@/lib/advertising-ordering'
+  getRestaurantDiscoverySurfaces,
+  getRestaurantPromotionDisclosure,
+} from '@/lib/advertising-display'
 import {
   fetchNotifications,
   fetchRestaurants,
@@ -171,21 +172,6 @@ function matchesTravelFilter(
   }
 
   return restaurant.venueDistanceKm <= getTravelRadiusKm(profile?.max_travel_minutes ?? 30)
-}
-
-function getApplicableRestaurantListSurfaces(input: {
-  query: string
-  selectedArea: string
-  selectedCuisine: string
-}) {
-  return [
-    ...(input.query ? (['restaurant_search'] as const) : []),
-    ...(input.selectedCuisine !== 'all' ? (['restaurant_category'] as const) : []),
-    ...(input.selectedArea !== 'all' ? (['restaurant_neighbourhood'] as const) : []),
-    ...(input.query || input.selectedCuisine !== 'all' || input.selectedArea !== 'all'
-      ? []
-      : (['restaurant_search'] as const)),
-  ]
 }
 
 function compactList(values: string[] | null | undefined, fallback: string[]) {
@@ -556,13 +542,17 @@ export default function RestaurantsPage() {
       ),
     [restaurants]
   )
+  const discoveryRestaurantSurfaces = useMemo(
+    () =>
+      getRestaurantDiscoverySurfaces({
+        query: searchWithinMatches.trim().toLowerCase(),
+        selectedArea,
+        selectedCuisine,
+      }),
+    [searchWithinMatches, selectedArea, selectedCuisine]
+  )
   const visibleRestaurants = useMemo(() => {
     const query = searchWithinMatches.trim().toLowerCase()
-    const applicableListSurfaces = getApplicableRestaurantListSurfaces({
-      query,
-      selectedArea,
-      selectedCuisine,
-    })
 
     return restaurants
       .filter((restaurant) => !showSavedOnly || restaurant.isSaved)
@@ -587,11 +577,12 @@ export default function RestaurantsPage() {
               activeTune,
               showLiveOnly,
             }),
-          surfaces: applicableListSurfaces,
+          surfaces: discoveryRestaurantSurfaces,
         })
       )
   }, [
     activeTune,
+    discoveryRestaurantSurfaces,
     restaurants,
     searchWithinMatches,
     selectedArea,
@@ -602,15 +593,6 @@ export default function RestaurantsPage() {
     showSavedOnly,
     profile,
   ])
-  const applicableRestaurantListSurfaces = useMemo(
-    () =>
-      getApplicableRestaurantListSurfaces({
-        query: searchWithinMatches.trim().toLowerCase(),
-        selectedArea,
-        selectedCuisine,
-      }),
-    [searchWithinMatches, selectedArea, selectedCuisine]
-  )
   const savedRestaurants = useMemo(
     () => restaurants.filter((restaurant) => restaurant.isSaved).slice(0, 3),
     [restaurants]
@@ -620,8 +602,16 @@ export default function RestaurantsPage() {
     [notifications]
   )
   const savedVisibleRestaurants = useMemo(
-    () => visibleRestaurants.filter((restaurant) => restaurant.isSaved),
-    [visibleRestaurants]
+    () =>
+      visibleRestaurants
+        .filter((restaurant) => restaurant.isSaved)
+        .sort((left, right) =>
+          compareRestaurantsOrganically(left, right, {
+            activeTune,
+            showLiveOnly,
+          })
+        ),
+    [activeTune, showLiveOnly, visibleRestaurants]
   )
   const unsavedVisibleRestaurants = useMemo(
     () =>
@@ -634,10 +624,10 @@ export default function RestaurantsPage() {
                 activeTune,
                 showLiveOnly,
               }),
-            surfaces: ['restaurant_recommendations'],
+            surfaces: discoveryRestaurantSurfaces,
           })
         ),
-    [activeTune, showLiveOnly, visibleRestaurants]
+    [activeTune, discoveryRestaurantSurfaces, showLiveOnly, visibleRestaurants]
   )
   const liveVisibleCount = useMemo(
     () => visibleRestaurants.filter((restaurant) => restaurant.availableEventCount > 0).length,
@@ -798,11 +788,12 @@ export default function RestaurantsPage() {
                         onHighlightChange={setHighlightedRestaurantId}
                         onOpenDetails={setSelectedRestaurant}
                         onToggleSaved={(restaurantId, action) => void handleToggleSaved(restaurantId, action)}
-                        promotionDisclosure={getPromotionDisclosureForSurfaces(
-                          restaurant.promotionPriorities,
-                          restaurant.promotionDisclosures,
-                          ['restaurant_recommendations']
-                        )}
+                        promotionDisclosure={getRestaurantPromotionDisclosure({
+                          isSaved: restaurant.isSaved,
+                          promotionDisclosures: restaurant.promotionDisclosures,
+                          promotionPriorities: restaurant.promotionPriorities,
+                          surfaces: discoveryRestaurantSurfaces,
+                        })}
                         restaurant={restaurant}
                         saving={restaurantActionLoadingId === restaurant.id}
                       />
@@ -830,11 +821,7 @@ export default function RestaurantsPage() {
                         onHighlightChange={setHighlightedRestaurantId}
                         onOpenDetails={setSelectedRestaurant}
                         onToggleSaved={(restaurantId, action) => void handleToggleSaved(restaurantId, action)}
-                        promotionDisclosure={getPromotionDisclosureForSurfaces(
-                          restaurant.promotionPriorities,
-                          restaurant.promotionDisclosures,
-                          applicableRestaurantListSurfaces
-                        )}
+                        promotionDisclosure={null}
                         restaurant={restaurant}
                         saving={restaurantActionLoadingId === restaurant.id}
                       />
