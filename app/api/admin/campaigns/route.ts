@@ -86,7 +86,11 @@ class CampaignRequestValidationError extends Error {
   }
 }
 
-class CampaignMutationRpcError extends Error {}
+class CampaignMutationRpcError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
+}
 
 async function fetchRestaurantTarget(adminClient: ReturnType<typeof createServerSupabaseAdminClient>, restaurantId: number) {
   const { data: restaurant, error } = await adminClient
@@ -171,7 +175,7 @@ async function runCampaignMutation(
   })
 
   if (response.error) {
-    throw new CampaignMutationRpcError('Campaign mutation RPC failed.')
+    throw new CampaignMutationRpcError(`Campaign mutation RPC failed: ${response.error.message}`)
   }
 
   const rows = Array.isArray(response.data) ? (response.data as MutationResultRow[]) : []
@@ -561,6 +565,21 @@ export async function PATCH(request: Request) {
             startsOn,
             surfaces,
           }
+        : action === 'activate' || action === 'pause' || action === 'reactivate' || action === 'end'
+          ? {
+              action,
+              actorId,
+              campaignId,
+              campaignType,
+              endsOn,
+              eventId,
+              internalNotes: currentCampaign.internal_notes ?? '',
+              name: currentCampaign.name,
+              promotionPriority,
+              restaurantId,
+              startsOn,
+              surfaces: currentSurfaces,
+            }
         : {
             action,
             actorId,

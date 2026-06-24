@@ -480,8 +480,56 @@ describe('admin campaigns route', () => {
       expect.objectContaining({
         p_action: 'activate',
         p_campaign_id: 1,
+        p_campaign_type: 'promoted_event',
+        p_ends_on: '2026-07-10',
+        p_event_id: 9,
+        p_internal_notes: '',
+        p_name: 'Campaign',
+        p_promotion_priority: 0,
+        p_restaurant_id: null,
+        p_starts_on: '2026-07-01',
+        p_surfaces: ['event_explore', 'event_list'],
       })
     )
+  })
+
+  it('returns a safe 500 when a lifecycle mutation RPC transport error occurs', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'draft',
+      },
+      currentSurfaces: ['restaurant_search'],
+      rpcError: { message: 'transport-level rpc failure detail' },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'activate', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(payload.error).toBe('Failed to update campaign.')
+    expect(JSON.stringify(payload)).not.toContain('transport-level rpc failure detail')
+    expect(consoleErrorSpy).toHaveBeenCalled()
   })
 
   it('keeps the trusted mutation SQL path aligned with the live event surface activation rule', () => {
