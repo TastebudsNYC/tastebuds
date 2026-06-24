@@ -92,6 +92,19 @@ class CampaignMutationRpcError extends Error {
   }
 }
 
+function getSafeCampaignMutationErrorMessage(error: CampaignMutationRpcError) {
+  const normalizedMessage = error.message.toLowerCase()
+
+  if (
+    normalizedMessage.includes('could not find the function public.mutate_promotion_campaign') ||
+    normalizedMessage.includes('function public.mutate_promotion_campaign')
+  ) {
+    return 'Campaign mutations are unavailable because the database function is out of date. Apply the latest advertising campaign SQL changes.'
+  }
+
+  return 'Campaign mutations are currently unavailable. Check the server logs for the underlying database error.'
+}
+
 async function fetchRestaurantTarget(adminClient: ReturnType<typeof createServerSupabaseAdminClient>, restaurantId: number) {
   const { data: restaurant, error } = await adminClient
     .from('restaurants')
@@ -386,6 +399,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: error.status })
     }
 
+    if (error instanceof CampaignMutationRpcError) {
+      console.error('Campaign create failed.', error)
+
+      return NextResponse.json(
+        { error: getSafeCampaignMutationErrorMessage(error) },
+        { status: 500 }
+      )
+    }
+
     console.error('Campaign create failed.', error)
 
     return NextResponse.json(
@@ -598,6 +620,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: error.message }, { status: error.status })
     }
 
+    if (error instanceof CampaignMutationRpcError) {
+      console.error('Campaign update failed.', error)
+
+      return NextResponse.json(
+        { error: getSafeCampaignMutationErrorMessage(error) },
+        { status: 500 }
+      )
+    }
+
     console.error('Campaign update failed.', error)
 
     return NextResponse.json(
@@ -668,6 +699,15 @@ export async function DELETE(request: Request) {
   } catch (error) {
     if (error instanceof CampaignRequestValidationError) {
       return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+
+    if (error instanceof CampaignMutationRpcError) {
+      console.error('Campaign delete failed.', error)
+
+      return NextResponse.json(
+        { error: getSafeCampaignMutationErrorMessage(error) },
+        { status: 500 }
+      )
     }
 
     console.error('Campaign delete failed.', error)

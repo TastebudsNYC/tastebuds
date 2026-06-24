@@ -299,7 +299,9 @@ describe('admin campaigns route', () => {
     const payload = await response.json()
 
     expect(response.status).toBe(500)
-    expect(payload.error).toBe('Failed to create campaign.')
+    expect(payload.error).toBe(
+      'Campaign mutations are currently unavailable. Check the server logs for the underlying database error.'
+    )
     expect(JSON.stringify(payload)).not.toContain('database exploded')
     expect(adminClient.rpc).toHaveBeenCalledWith(
       'mutate_promotion_campaign',
@@ -527,8 +529,53 @@ describe('admin campaigns route', () => {
     const payload = await response.json()
 
     expect(response.status).toBe(500)
-    expect(payload.error).toBe('Failed to update campaign.')
+    expect(payload.error).toBe(
+      'Campaign mutations are currently unavailable. Check the server logs for the underlying database error.'
+    )
     expect(JSON.stringify(payload)).not.toContain('transport-level rpc failure detail')
+    expect(consoleErrorSpy).toHaveBeenCalled()
+  })
+
+  it('returns a specific safe message when the mutation function is missing or out of date', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'draft',
+      },
+      currentSurfaces: ['restaurant_search'],
+      rpcError: {
+        message:
+          'Could not find the function public.mutate_promotion_campaign(p_action, p_campaign_id, p_name, p_campaign_type, p_restaurant_id, p_event_id, p_starts_on, p_ends_on, p_promotion_priority, p_internal_notes, p_surfaces, p_actor_id) in the schema cache',
+      },
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'activate', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(payload.error).toBe(
+      'Campaign mutations are unavailable because the database function is out of date. Apply the latest advertising campaign SQL changes.'
+    )
     expect(consoleErrorSpy).toHaveBeenCalled()
   })
 
