@@ -1,7 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type {
+  ButtonHTMLAttributes,
+  MouseEventHandler,
+  ReactNode,
+} from 'react'
 
 import { cx } from '@/lib/app/format'
 
@@ -20,6 +24,8 @@ type ButtonElementProps = BaseButtonProps &
 
 type LinkButtonProps = BaseButtonProps & {
   href: string
+  onClick?: MouseEventHandler<HTMLAnchorElement>
+  rel?: string
   target?: string
 }
 
@@ -54,8 +60,10 @@ export function Button({
   )
 
   if ('href' in props && props.href) {
+    const { href, target, ...linkProps } = props
+
     return (
-      <Link className={classNames} href={props.href} target={props.target}>
+      <Link className={classNames} href={href} target={target} {...linkProps}>
         {children}
       </Link>
     )

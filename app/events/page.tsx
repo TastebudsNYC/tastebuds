@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppShell } from '@/components/app/AppShell'
 import { ActivityRail, TasteProfileRail } from '@/components/app/AppRails'
@@ -12,10 +12,14 @@ import { EventDetailsModal } from '@/components/app/EventDetailsModal'
 import { EventJoinConfirmModal } from '@/components/app/EventJoinConfirmModal'
 import { AppPageSkeleton } from '@/components/app/LoadingSkeleton'
 import { PageHeader } from '@/components/app/PageHeader'
+import { PromotionImpressionObserver } from '@/components/app/PromotionImpressionObserver'
 import { useToast } from '@/components/app/ToastProvider'
+import { trackPromotionMetric } from '@/lib/advertising-attribution-client'
+import type { PromotionSourceContext } from '@/lib/advertising-attribution'
 import {
   compareEntitiesWithConditionalPromotion,
   getEventPromotionDisclosure,
+  getEventPromotionSource,
   isEventDiscoveryPlacementContext,
 } from '@/lib/advertising-display'
 import {
@@ -184,6 +188,8 @@ export default function EventsPage() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null)
   const [highlightedRestaurantId, setHighlightedRestaurantId] = useState<number | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [selectedEventPromotionSource, setSelectedEventPromotionSource] =
+    useState<PromotionSourceContext | null>(null)
   const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -195,6 +201,9 @@ export default function EventsPage() {
   const [selectedTravel, setSelectedTravel] = useState<TravelFilter>('any')
   const [sortBy, setSortBy] = useState<EventSort>('match')
   const [pendingJoinEventId, setPendingJoinEventId] = useState<number | null>(null)
+  const [pendingJoinPromotionSource, setPendingJoinPromotionSource] =
+    useState<PromotionSourceContext | null>(null)
+  const seenPromotionImpressionKeysRef = useRef<Set<string>>(new Set())
   const placeFilter = searchParams.get('place')
 
   useEffect(() => {
@@ -296,7 +305,11 @@ export default function EventsPage() {
     return match?.id ?? null
   }
 
-  async function handleEventSignup(eventId: number, action: 'join' | 'leave') {
+  async function handleEventSignup(
+    eventId: number,
+    action: 'join' | 'leave',
+    promotionSource?: PromotionSourceContext | null
+  ) {
     setError('')
     setEventActionLoadingId(eventId)
 
@@ -313,7 +326,7 @@ export default function EventsPage() {
         await setSavedRestaurant(restaurantId, 'save')
       }
 
-      await setEventSignup(eventId, action)
+      await setEventSignup(eventId, action, promotionSource?.surface ?? null)
       const refreshedEvents = await refreshPageData()
       const updatedEvent = refreshedEvents.find((event) => event.id === eventId) ?? eventToUpdate
 
@@ -334,6 +347,29 @@ export default function EventsPage() {
     } finally {
       setEventActionLoadingId(null)
     }
+  }
+
+  function handleOpenEventDetails(
+    event: DashboardEvent,
+    promotionSource: PromotionSourceContext | null
+  ) {
+    setSelectedEventPromotionSource(promotionSource)
+    setSelectedEventId(event.id)
+    setFeedbackDraft(toFeedbackDraft(event))
+
+    if (promotionSource) {
+      void trackPromotionMetric('event_view', promotionSource)
+    }
+  }
+
+  function handleEventMenuClick() {
+    if (!selectedEventPromotionSource) {
+      return
+    }
+
+    void trackPromotionMetric('website_click', selectedEventPromotionSource, {
+      keepalive: true,
+    })
   }
 
   async function handleDayOfConfirmation(eventId: number, action: 'confirm' | 'decline') {
@@ -502,6 +538,7 @@ export default function EventsPage() {
       null
 
     if (nextEvent) {
+      setSelectedEventPromotionSource(null)
       setSelectedEventId(nextEvent.id)
       setFeedbackDraft(toFeedbackDraft(nextEvent))
     }
@@ -691,45 +728,60 @@ export default function EventsPage() {
 
           <div className="grid gap-5">
             {groupedEvents.active.length > 0 ? (
-              groupedEvents.active.map((event) => (
-                <EventCard
-                  event={event}
-                  eventActionLoadingId={eventActionLoadingId}
-                  highlighted={
-                    (highlightedRestaurantId ?? selectedRestaurantId) !== null &&
-                    findRestaurantIdForEvent(event) ===
-                      (highlightedRestaurantId ?? selectedRestaurantId)
-                  }
-                  key={event.id}
-                  onHighlightChange={(eventId) => {
-                    const highlightedEvent =
-                      eventId === null
-                        ? null
-                        : visibleEvents.find((candidate) => candidate.id === eventId) ?? null
-                    setHighlightedRestaurantId(
-                      highlightedEvent ? findRestaurantIdForEvent(highlightedEvent) : null
-                    )
-                  }}
-                  onOpenDetails={() => {
-                    setSelectedEventId(event.id)
-                    setFeedbackDraft(toFeedbackDraft(event))
-                  }}
-                  onSetEventSignup={(action) => {
-                    if (action === 'join') {
-                      setPendingJoinEventId(event.id)
-                      return
-                    }
+              groupedEvents.active.map((event) => {
+                const promotionSource = getEventPromotionSource({
+                  hasEnded: event.hasEnded,
+                  isJoined: event.isJoined,
+                  promotionDisclosures: event.promotionDisclosures,
+                  promotionPriorities: event.promotionPriorities,
+                  targetId: event.id,
+                })
 
-                    void handleEventSignup(event.id, action)
-                  }}
-                  promotionDisclosure={getEventPromotionDisclosure({
-                    hasEnded: event.hasEnded,
-                    isJoined: event.isJoined,
-                    promotionDisclosures: event.promotionDisclosures,
-                    promotionPriorities: event.promotionPriorities,
-                  })}
-                />
-              ))
+                return (
+                  <PromotionImpressionObserver
+                    key={event.id}
+                    seenKeysRef={seenPromotionImpressionKeysRef}
+                    source={promotionSource}
+                  >
+                    <EventCard
+                      event={event}
+                      eventActionLoadingId={eventActionLoadingId}
+                      highlighted={
+                        (highlightedRestaurantId ?? selectedRestaurantId) !== null &&
+                        findRestaurantIdForEvent(event) ===
+                          (highlightedRestaurantId ?? selectedRestaurantId)
+                      }
+                      onHighlightChange={(eventId) => {
+                        const highlightedEvent =
+                          eventId === null
+                            ? null
+                            : visibleEvents.find((candidate) => candidate.id === eventId) ?? null
+                        setHighlightedRestaurantId(
+                          highlightedEvent ? findRestaurantIdForEvent(highlightedEvent) : null
+                        )
+                      }}
+                      onOpenDetails={() => {
+                        handleOpenEventDetails(event, promotionSource)
+                      }}
+                      onSetEventSignup={(action) => {
+                        if (action === 'join') {
+                          setPendingJoinEventId(event.id)
+                          setPendingJoinPromotionSource(promotionSource)
+                          return
+                        }
+
+                        void handleEventSignup(event.id, action, promotionSource)
+                      }}
+                      promotionDisclosure={getEventPromotionDisclosure({
+                        hasEnded: event.hasEnded,
+                        isJoined: event.isJoined,
+                        promotionDisclosures: event.promotionDisclosures,
+                        promotionPriorities: event.promotionPriorities,
+                      })}
+                    />
+                  </PromotionImpressionObserver>
+                )
+              })
             ) : (
               <EmptyState
                 action={
@@ -807,16 +859,16 @@ export default function EventsPage() {
                       )
                     }}
                     onOpenDetails={() => {
-                      setSelectedEventId(event.id)
-                      setFeedbackDraft(toFeedbackDraft(event))
+                      handleOpenEventDetails(event, null)
                     }}
                     onSetEventSignup={(action) => {
                       if (action === 'join') {
                         setPendingJoinEventId(event.id)
+                        setPendingJoinPromotionSource(null)
                         return
                       }
 
-                      void handleEventSignup(event.id, action)
+                      void handleEventSignup(event.id, action, null)
                     }}
                     promotionDisclosure={null}
                   />
@@ -847,24 +899,28 @@ export default function EventsPage() {
           event={selectedEvent}
           eventActionLoadingId={eventActionLoadingId}
           feedbackSavingId={feedbackSavingId}
+          onMenuClick={handleEventMenuClick}
           onClose={() => {
             setSelectedEventId(null)
+            setSelectedEventPromotionSource(null)
             setFeedbackDraft(null)
           }}
           onFeedbackDraftChange={setFeedbackDraft}
           onSelectSimilarEvent={(eventId) => {
             const nextEvent = visibleEvents.find((event) => event.id === eventId) ?? null
             setSelectedEventId(eventId)
+            setSelectedEventPromotionSource(null)
             setFeedbackDraft(nextEvent ? toFeedbackDraft(nextEvent) : null)
           }}
           onSetDayOfConfirmation={(action) => void handleDayOfConfirmation(selectedEvent.id, action)}
           onSetEventSignup={(action) => {
             if (action === 'join') {
               setPendingJoinEventId(selectedEvent.id)
+              setPendingJoinPromotionSource(selectedEventPromotionSource)
               return
             }
 
-            void handleEventSignup(selectedEvent.id, action)
+            void handleEventSignup(selectedEvent.id, action, selectedEventPromotionSource)
           }}
           onSubmitFeedback={() => void handleFeedbackSubmit(selectedEvent.id)}
           similarEvents={similarEvents}
@@ -876,10 +932,14 @@ export default function EventsPage() {
         <EventJoinConfirmModal
           event={pendingJoinEvent}
           loading={eventActionLoadingId === pendingJoinEvent.id}
-          onCancel={() => setPendingJoinEventId(null)}
-          onConfirm={() => {
-            void handleEventSignup(pendingJoinEvent.id, 'join')
+          onCancel={() => {
             setPendingJoinEventId(null)
+            setPendingJoinPromotionSource(null)
+          }}
+          onConfirm={() => {
+            void handleEventSignup(pendingJoinEvent.id, 'join', pendingJoinPromotionSource)
+            setPendingJoinEventId(null)
+            setPendingJoinPromotionSource(null)
           }}
         />
       ) : null}

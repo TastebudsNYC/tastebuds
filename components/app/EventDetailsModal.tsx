@@ -9,6 +9,7 @@ export function EventDetailsModal({
   eventActionLoadingId,
   feedbackDraft,
   feedbackSavingId,
+  onMenuClick,
   onClose,
   onFeedbackDraftChange,
   onSelectSimilarEvent,
@@ -21,6 +22,7 @@ export function EventDetailsModal({
   eventActionLoadingId?: number | null
   feedbackDraft?: FeedbackDraft
   feedbackSavingId?: number | null
+  onMenuClick?: () => void
   onClose: () => void
   onFeedbackDraftChange?: (draft: FeedbackDraft) => void
   onSelectSimilarEvent?: (eventId: number) => void
@@ -35,6 +37,7 @@ export function EventDetailsModal({
         <EventCard
           event={event}
           onCloseDetails={requestClose}
+          {...(onMenuClick ? { onMenuClick } : {})}
           similarEvents={similarEvents}
           showDetails
           withinModal

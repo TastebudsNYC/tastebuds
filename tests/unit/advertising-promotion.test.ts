@@ -8,8 +8,10 @@ import {
   compareEntitiesOrganically,
   compareEntitiesWithConditionalPromotion,
   getEventPromotionDisclosure,
+  getEventPromotionSource,
   getRestaurantDiscoverySurfaces,
   getRestaurantPromotionDisclosure,
+  getRestaurantPromotionSource,
   getRestaurantRecommendationSurfaces,
   isEventDiscoveryPlacementContext,
 } from '@/lib/advertising-display'
@@ -347,6 +349,20 @@ describe('advertising promotion helpers', () => {
         surfaces: ['restaurant_recommendations'],
       })
     ).toBe('Founding Partner')
+
+    expect(
+      getRestaurantPromotionSource({
+        isSaved: true,
+        promotionDisclosures: {
+          restaurant_recommendations: 'Founding Partner',
+        },
+        promotionPriorities: {
+          restaurant_recommendations: 9,
+        },
+        surfaces: ['restaurant_search'],
+        targetId: 44,
+      })
+    ).toBeNull()
   })
 
   it('does not produce restaurant disclosure for deferred restaurant_recommendations in the current main list', () => {
@@ -435,6 +451,19 @@ describe('advertising promotion helpers', () => {
         },
       })
     ).toBeNull()
+    expect(
+      getEventPromotionSource({
+        hasEnded: false,
+        isJoined: true,
+        promotionDisclosures: {
+          event_list: 'Sponsored',
+        },
+        promotionPriorities: {
+          event_list: 8,
+        },
+        targetId: 91,
+      })
+    ).toBeNull()
   })
 
   it('shows restaurant disclosure only for the applicable current surface', () => {
@@ -507,6 +536,19 @@ describe('advertising promotion helpers', () => {
         surfaces: ['restaurant_category', 'restaurant_neighbourhood'],
       })
     ).toBe('Sponsored')
+    expect(
+      getRestaurantPromotionSource({
+        isSaved: false,
+        promotionDisclosures: candidate.promotionDisclosures,
+        promotionPriorities: candidate.promotionPriorities,
+        surfaces: ['restaurant_category', 'restaurant_neighbourhood'],
+        targetId: candidate.id,
+      })
+    ).toEqual({
+      surface: 'restaurant_neighbourhood',
+      targetId: 12,
+      targetType: 'restaurant',
+    })
   })
 
   it('shows event disclosure only for the live event list surface', () => {

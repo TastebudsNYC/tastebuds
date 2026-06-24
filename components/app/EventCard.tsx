@@ -385,6 +385,7 @@ export function EventCard({
   onCloseDetails,
   onHighlightChange,
   onFeedbackDraftChange,
+  onMenuClick,
   onOpenDetails,
   onSelectSimilarEvent,
   onSetDayOfConfirmation,
@@ -403,6 +404,7 @@ export function EventCard({
   onCloseDetails?: () => void
   onHighlightChange?: (restaurantId: number | null) => void
   onFeedbackDraftChange?: (draft: FeedbackDraft) => void
+  onMenuClick?: () => void
   onOpenDetails?: () => void
   onSelectSimilarEvent?: (eventId: number) => void
   onSetDayOfConfirmation?: (action: 'confirm' | 'decline') => void
@@ -845,7 +847,12 @@ export function EventCard({
                   </Button>
                 )}
                 {event.restaurantWebsiteUri ? (
-                  <Button href={event.restaurantWebsiteUri} target="_blank" variant="secondary">
+                  <Button
+                    href={event.restaurantWebsiteUri}
+                    target="_blank"
+                    variant="secondary"
+                    {...(onMenuClick ? { onClick: onMenuClick } : {})}
+                  >
                     Menu
                   </Button>
                 ) : null}

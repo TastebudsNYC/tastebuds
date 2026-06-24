@@ -39,12 +39,14 @@ function getFallbackSubtitle(restaurant: DashboardRestaurant) {
 }
 
 export function RestaurantDetailsModal({
+  onMenuClick,
   onClose,
   onToggleSaved,
   restaurant,
   saving,
   showEventsAction = true,
 }: {
+  onMenuClick?: () => void
   onClose: () => void
   onToggleSaved?: (restaurantId: number, action: 'save' | 'unsave') => void
   restaurant: DashboardRestaurant
@@ -260,7 +262,12 @@ export function RestaurantDetailsModal({
                 </Button>
               ) : null}
               {websiteUri ? (
-                <Button href={websiteUri} target="_blank" variant="secondary">
+                <Button
+                  href={websiteUri}
+                  target="_blank"
+                  variant="secondary"
+                  {...(onMenuClick ? { onClick: onMenuClick } : {})}
+                >
                   Menu
                 </Button>
               ) : null}

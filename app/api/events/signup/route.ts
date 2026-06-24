@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+import { isLivePromotionSurface } from '@/lib/advertising'
+import { isLiveSurfaceCompatibleWithTargetType } from '@/lib/advertising-attribution'
+import { recordPromotionMetric } from '@/lib/advertising-tracking'
 import {
   refreshEventViability,
   syncEventSignupScores,
@@ -15,6 +18,7 @@ type SignupAction = 'join' | 'leave'
 type SignupRequest = {
   action?: SignupAction
   eventId?: number
+  promotionSurface?: string | null
 }
 
 type EventRow = {
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { error: existingSignupError } = await adminClient
+    const { data: existingSignup, error: existingSignupError } = await adminClient
       .from('event_signups')
       .select(
         'personal_match_score, personal_match_summary, restaurant_match_score, status'
@@ -283,6 +287,23 @@ export async function POST(request: Request) {
         userId: user.id,
       },
     ])
+
+    if (
+      existingSignup?.status !== 'going' &&
+      isLivePromotionSurface(body.promotionSurface) &&
+      isLiveSurfaceCompatibleWithTargetType(body.promotionSurface, 'event')
+    ) {
+      try {
+        await recordPromotionMetric(adminClient, {
+          metric: 'rsvp',
+          surface: body.promotionSurface,
+          targetId: eventId,
+          targetType: 'event',
+        })
+      } catch (trackingError) {
+        console.error('Failed to record event RSVP attribution.', trackingError)
+      }
+    }
 
     return NextResponse.json({
       eventId,

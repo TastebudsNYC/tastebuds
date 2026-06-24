@@ -12,6 +12,37 @@ type PromotableEntity = {
 
 export type { PromotionDisclosure, PromotionDisclosureBySurface, PromotionPriorityBySurface }
 
+export function getWinningPromotionForSurfaces(
+  priorities: PromotionPriorityBySurface | null | undefined,
+  disclosures: PromotionDisclosureBySurface | null | undefined,
+  surfaces: readonly PromotionSurface[]
+) {
+  let bestDisclosure: PromotionDisclosure | null = null
+  let bestPriority: number | null = null
+  let bestSurface: PromotionSurface | null = null
+
+  for (const surface of surfaces) {
+    const disclosure = disclosures?.[surface]
+    const priority = priorities?.[surface]
+
+    if (!disclosure || typeof priority !== 'number') {
+      continue
+    }
+
+    if (bestPriority === null || priority > bestPriority) {
+      bestPriority = priority
+      bestDisclosure = disclosure
+      bestSurface = surface
+    }
+  }
+
+  return {
+    disclosure: bestDisclosure,
+    priority: bestPriority,
+    surface: bestSurface,
+  }
+}
+
 export function getHighestPromotionPriority(
   priorities: PromotionPriorityBySurface | null | undefined,
   surfaces: readonly PromotionSurface[]
@@ -72,22 +103,5 @@ export function getPromotionDisclosureForSurfaces(
   disclosures: PromotionDisclosureBySurface | null | undefined,
   surfaces: readonly PromotionSurface[]
 ) {
-  let bestDisclosure: PromotionDisclosure | null = null
-  let bestPriority: number | null = null
-
-  for (const surface of surfaces) {
-    const disclosure = disclosures?.[surface]
-    const priority = priorities?.[surface]
-
-    if (!disclosure || typeof priority !== 'number') {
-      continue
-    }
-
-    if (bestPriority === null || priority > bestPriority) {
-      bestPriority = priority
-      bestDisclosure = disclosure
-    }
-  }
-
-  return bestDisclosure
+  return getWinningPromotionForSurfaces(priorities, disclosures, surfaces).disclosure
 }

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 
+import { isLivePromotionSurface } from '@/lib/advertising'
 import {
   attachPromotionMetadata,
   mergeOrganicAndPromotedRows,
   resolveActivePromotionRecords,
 } from '@/lib/advertising-resolver'
+import { isLiveSurfaceCompatibleWithTargetType } from '@/lib/advertising-attribution'
+import { recordPromotionMetric } from '@/lib/advertising-tracking'
 import {
   calculateDistanceKm,
   type ProfileForScoring,
@@ -469,6 +472,7 @@ export async function POST(request: Request) {
     const adminClient = createServerSupabaseAdminClient()
     const body = (await request.json()) as {
       action?: 'save' | 'unsave'
+      promotionSurface?: string | null
       restaurantId?: number
     }
     const restaurantId = Number(body.restaurantId)
@@ -501,6 +505,23 @@ export async function POST(request: Request) {
 
     if (error && error.code !== '23505') {
       throw new Error(error.message)
+    }
+
+    if (
+      !error &&
+      isLivePromotionSurface(body.promotionSurface) &&
+      isLiveSurfaceCompatibleWithTargetType(body.promotionSurface, 'restaurant')
+    ) {
+      try {
+        await recordPromotionMetric(adminClient, {
+          metric: 'save',
+          surface: body.promotionSurface,
+          targetId: restaurantId,
+          targetType: 'restaurant',
+        })
+      } catch (trackingError) {
+        console.error('Failed to record restaurant save attribution.', trackingError)
+      }
     }
 
     return NextResponse.json({ ok: true })

@@ -1,6 +1,8 @@
-import type { PromotionSurface } from '@/lib/advertising'
+import type { LivePromotionSurface, PromotionSurface } from '@/lib/advertising'
+import type { PromotionSourceContext } from '@/lib/advertising-attribution'
 import {
   compareEntitiesWithPromotion,
+  getWinningPromotionForSurfaces,
   getPromotionDisclosureForSurfaces,
 } from '@/lib/advertising-ordering'
 import type {
@@ -62,6 +64,34 @@ export function getRestaurantPromotionDisclosure(input: {
   )
 }
 
+export function getRestaurantPromotionSource(input: {
+  isSaved: boolean
+  promotionDisclosures?: PromotionDisclosureBySurface | null | undefined
+  promotionPriorities?: PromotionPriorityBySurface | null | undefined
+  surfaces: readonly PromotionSurface[]
+  targetId: number
+}): PromotionSourceContext | null {
+  if (input.isSaved) {
+    return null
+  }
+
+  const winningPromotion = getWinningPromotionForSurfaces(
+    input.promotionPriorities,
+    input.promotionDisclosures,
+    input.surfaces
+  )
+
+  if (!winningPromotion.surface) {
+    return null
+  }
+
+  return {
+    surface: winningPromotion.surface as LivePromotionSurface,
+    targetId: input.targetId,
+    targetType: 'restaurant',
+  }
+}
+
 export function isEventDiscoveryPlacementContext(input: {
   hasEnded: boolean
   isJoined: boolean
@@ -84,6 +114,34 @@ export function getEventPromotionDisclosure(input: {
     input.promotionDisclosures,
     ['event_list']
   )
+}
+
+export function getEventPromotionSource(input: {
+  hasEnded: boolean
+  isJoined: boolean
+  promotionDisclosures?: PromotionDisclosureBySurface | null | undefined
+  promotionPriorities?: PromotionPriorityBySurface | null | undefined
+  targetId: number
+}): PromotionSourceContext | null {
+  if (!isEventDiscoveryPlacementContext(input)) {
+    return null
+  }
+
+  const winningPromotion = getWinningPromotionForSurfaces(
+    input.promotionPriorities,
+    input.promotionDisclosures,
+    ['event_list']
+  )
+
+  if (winningPromotion.surface !== 'event_list') {
+    return null
+  }
+
+  return {
+    surface: 'event_list',
+    targetId: input.targetId,
+    targetType: 'event',
+  }
 }
 
 export function compareEntitiesWithConditionalPromotion<T extends PromotableEntity>(

@@ -1,5 +1,6 @@
 'use client'
 
+import type { LivePromotionSurface } from '@/lib/advertising'
 import type { DashboardEvent, DashboardRestaurant, NotificationSummary, Profile } from '@/lib/app/types'
 import { supabase } from '@/lib/supabase/client'
 
@@ -182,7 +183,11 @@ export async function fetchRestaurants(accessToken?: string) {
   return payload
 }
 
-export async function setEventSignup(eventId: number, action: 'join' | 'leave') {
+export async function setEventSignup(
+  eventId: number,
+  action: 'join' | 'leave',
+  promotionSurface?: LivePromotionSurface | null
+) {
   const accessToken = await getAccessToken()
 
   if (!accessToken) {
@@ -193,7 +198,7 @@ export async function setEventSignup(eventId: number, action: 'join' | 'leave') 
     '/api/events/signup',
     accessToken,
     {
-      body: JSON.stringify({ action, eventId }),
+      body: JSON.stringify({ action, eventId, promotionSurface: promotionSurface ?? null }),
       method: 'POST',
     }
   )
@@ -229,7 +234,8 @@ export async function setDayOfConfirmation(
 
 export async function setSavedRestaurant(
   restaurantId: number,
-  action: 'save' | 'unsave'
+  action: 'save' | 'unsave',
+  promotionSurface?: LivePromotionSurface | null
 ) {
   const accessToken = await getAccessToken()
 
@@ -241,7 +247,7 @@ export async function setSavedRestaurant(
     '/api/restaurants',
     accessToken,
     {
-      body: JSON.stringify({ action, restaurantId }),
+      body: JSON.stringify({ action, promotionSurface: promotionSurface ?? null, restaurantId }),
       method: 'POST',
     }
   )

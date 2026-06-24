@@ -9,14 +9,18 @@ import { AppPageSkeleton } from '@/components/app/LoadingSkeleton'
 import { Button } from '@/components/app/Button'
 import { EmptyState } from '@/components/app/EmptyState'
 import { PageHeader } from '@/components/app/PageHeader'
+import { PromotionImpressionObserver } from '@/components/app/PromotionImpressionObserver'
 import { RestaurantCard } from '@/components/app/RestaurantCard'
 import { RestaurantDetailsModal } from '@/components/app/RestaurantDetailsModal'
 import { useToast } from '@/components/app/ToastProvider'
+import { trackPromotionMetric } from '@/lib/advertising-attribution-client'
+import type { PromotionSourceContext } from '@/lib/advertising-attribution'
 import { compareEntitiesWithPromotion } from '@/lib/advertising-ordering'
 import {
   compareEntitiesOrganically,
   getRestaurantDiscoverySurfaces,
   getRestaurantPromotionDisclosure,
+  getRestaurantPromotionSource,
 } from '@/lib/advertising-display'
 import {
   fetchNotifications,
@@ -375,11 +379,14 @@ export default function RestaurantsPage() {
   const [selectedArea, setSelectedArea] = useState('all')
   const [selectedTravel, setSelectedTravel] = useState<TravelFilter>('any')
   const [selectedRestaurant, setSelectedRestaurant] = useState<DashboardRestaurant | null>(null)
+  const [selectedRestaurantPromotionSource, setSelectedRestaurantPromotionSource] =
+    useState<PromotionSourceContext | null>(null)
   const [highlightedRestaurantId, setHighlightedRestaurantId] = useState<number | null>(null)
   const [restaurantActionLoadingId, setRestaurantActionLoadingId] = useState<number | null>(null)
   const [isRetuning, setIsRetuning] = useState(false)
   const [flashRestaurantId, setFlashRestaurantId] = useState<number | null>(null)
   const retuneTimeoutRef = useRef<number | null>(null)
+  const seenPromotionImpressionKeysRef = useRef<Set<string>>(new Set())
 
   function beginRetuneFeedback() {
     setIsRetuning(true)
@@ -463,7 +470,11 @@ export default function RestaurantsPage() {
     router.replace('/login')
   }
 
-  async function handleToggleSaved(restaurantId: number, action: 'save' | 'unsave') {
+  async function handleToggleSaved(
+    restaurantId: number,
+    action: 'save' | 'unsave',
+    promotionSource?: PromotionSourceContext | null
+  ) {
     setError('')
     setRestaurantActionLoadingId(restaurantId)
     const previousRestaurants = restaurants
@@ -491,7 +502,7 @@ export default function RestaurantsPage() {
     }
 
     try {
-      await setSavedRestaurant(restaurantId, action)
+      await setSavedRestaurant(restaurantId, action, promotionSource?.surface ?? null)
       const payload = await fetchRestaurants()
       const refreshedRestaurants = payload.restaurants ?? optimisticRestaurants
       setRestaurants(refreshedRestaurants)
@@ -526,6 +537,28 @@ export default function RestaurantsPage() {
     } finally {
       setRestaurantActionLoadingId(null)
     }
+  }
+
+  function handleOpenRestaurantDetails(
+    restaurant: DashboardRestaurant,
+    promotionSource: PromotionSourceContext | null
+  ) {
+    setSelectedRestaurantPromotionSource(promotionSource)
+    setSelectedRestaurant(restaurant)
+
+    if (promotionSource) {
+      void trackPromotionMetric('venue_profile_view', promotionSource)
+    }
+  }
+
+  function handleRestaurantMenuClick() {
+    if (!selectedRestaurantPromotionSource) {
+      return
+    }
+
+    void trackPromotionMetric('website_click', selectedRestaurantPromotionSource, {
+      keepalive: true,
+    })
   }
 
   const cuisineOptions = useMemo(
@@ -659,6 +692,7 @@ export default function RestaurantsPage() {
 
   function handleSelectRestaurantFromMap(restaurantId: number | null) {
     if (restaurantId === null) {
+      setSelectedRestaurantPromotionSource(null)
       setSelectedRestaurant(null)
       return
     }
@@ -666,6 +700,7 @@ export default function RestaurantsPage() {
     const match = restaurants.find((restaurant) => restaurant.id === restaurantId)
 
     if (match) {
+      setSelectedRestaurantPromotionSource(null)
       setSelectedRestaurant(match)
     }
   }
@@ -783,24 +818,43 @@ export default function RestaurantsPage() {
                     </p>
                   </div>
                   <div className="grid gap-5">
-                    {unsavedVisibleRestaurants.map((restaurant) => (
-                      <RestaurantCard
-                        flashState={flashRestaurantId === restaurant.id ? 'saved' : null}
-                        highlighted={(highlightedRestaurantId ?? selectedRestaurant?.id ?? null) === restaurant.id}
-                        key={restaurant.id}
-                        onHighlightChange={setHighlightedRestaurantId}
-                        onOpenDetails={setSelectedRestaurant}
-                        onToggleSaved={(restaurantId, action) => void handleToggleSaved(restaurantId, action)}
-                        promotionDisclosure={getRestaurantPromotionDisclosure({
-                          isSaved: restaurant.isSaved,
-                          promotionDisclosures: restaurant.promotionDisclosures,
-                          promotionPriorities: restaurant.promotionPriorities,
-                          surfaces: discoveryRestaurantSurfaces,
-                        })}
-                        restaurant={restaurant}
-                        saving={restaurantActionLoadingId === restaurant.id}
-                      />
-                    ))}
+                    {unsavedVisibleRestaurants.map((restaurant) => {
+                      const promotionSource = getRestaurantPromotionSource({
+                        isSaved: restaurant.isSaved,
+                        promotionDisclosures: restaurant.promotionDisclosures,
+                        promotionPriorities: restaurant.promotionPriorities,
+                        surfaces: discoveryRestaurantSurfaces,
+                        targetId: restaurant.id,
+                      })
+
+                      return (
+                        <PromotionImpressionObserver
+                          key={restaurant.id}
+                          seenKeysRef={seenPromotionImpressionKeysRef}
+                          source={promotionSource}
+                        >
+                          <RestaurantCard
+                            flashState={flashRestaurantId === restaurant.id ? 'saved' : null}
+                            highlighted={(highlightedRestaurantId ?? selectedRestaurant?.id ?? null) === restaurant.id}
+                            onHighlightChange={setHighlightedRestaurantId}
+                            onOpenDetails={(nextRestaurant) =>
+                              handleOpenRestaurantDetails(nextRestaurant, promotionSource)
+                            }
+                            onToggleSaved={(restaurantId, action) =>
+                              void handleToggleSaved(restaurantId, action, promotionSource)
+                            }
+                            promotionDisclosure={getRestaurantPromotionDisclosure({
+                              isSaved: restaurant.isSaved,
+                              promotionDisclosures: restaurant.promotionDisclosures,
+                              promotionPriorities: restaurant.promotionPriorities,
+                              surfaces: discoveryRestaurantSurfaces,
+                            })}
+                            restaurant={restaurant}
+                            saving={restaurantActionLoadingId === restaurant.id}
+                          />
+                        </PromotionImpressionObserver>
+                      )
+                    })}
                   </div>
                 </section>
               ) : null}
@@ -822,8 +876,12 @@ export default function RestaurantsPage() {
                         highlighted={(highlightedRestaurantId ?? selectedRestaurant?.id ?? null) === restaurant.id}
                         key={restaurant.id}
                         onHighlightChange={setHighlightedRestaurantId}
-                        onOpenDetails={setSelectedRestaurant}
-                        onToggleSaved={(restaurantId, action) => void handleToggleSaved(restaurantId, action)}
+                        onOpenDetails={(nextRestaurant) =>
+                          handleOpenRestaurantDetails(nextRestaurant, null)
+                        }
+                        onToggleSaved={(restaurantId, action) =>
+                          void handleToggleSaved(restaurantId, action, null)
+                        }
                         promotionDisclosure={null}
                         restaurant={restaurant}
                         saving={restaurantActionLoadingId === restaurant.id}
@@ -901,8 +959,14 @@ export default function RestaurantsPage() {
 
       {selectedRestaurant ? (
         <RestaurantDetailsModal
-          onClose={() => setSelectedRestaurant(null)}
-          onToggleSaved={(restaurantId, action) => void handleToggleSaved(restaurantId, action)}
+          onClose={() => {
+            setSelectedRestaurant(null)
+            setSelectedRestaurantPromotionSource(null)
+          }}
+          onMenuClick={handleRestaurantMenuClick}
+          onToggleSaved={(restaurantId, action) =>
+            void handleToggleSaved(restaurantId, action, selectedRestaurantPromotionSource)
+          }
           restaurant={
             restaurants.find((restaurant) => restaurant.id === selectedRestaurant.id) ??
             selectedRestaurant
