@@ -62,4 +62,13 @@ describe('advertising attribution SQL', () => {
       "raise exception 'Metric % is not compatible with event targets.', p_metric;"
     )
   })
+
+  it('excludes archived campaigns from attribution writes', () => {
+    const migrationSql = readFileSync(
+      'supabase/migrations/202606250001_campaign_archiving.sql',
+      'utf8'
+    )
+
+    expect(migrationSql).toContain('where pc.archived_at is null')
+  })
 })

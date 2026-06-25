@@ -138,6 +138,44 @@ describe('advertising promotion helpers', () => {
     ])
   })
 
+  it('ignores archived campaigns in resolved placement metadata', () => {
+    const resolved = buildResolvedPromotionRecords(
+      [
+        {
+          archived_at: '2026-06-25T10:00:00Z',
+          campaign_type: 'founding_partner',
+          id: 13,
+          promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
+          promotion_priority: 10,
+          restaurant_id: 44,
+          starts_on: '2026-07-01',
+        },
+        {
+          archived_at: null,
+          campaign_type: 'sponsored_listing',
+          id: 14,
+          promotion_campaign_surfaces: [{ surface: 'restaurant_search' }],
+          promotion_priority: 4,
+          restaurant_id: 44,
+          starts_on: '2026-07-01',
+        },
+      ],
+      'restaurant'
+    )
+
+    expect(resolved).toEqual([
+      {
+        promotionPriorities: {
+          restaurant_search: 4,
+        },
+        promotionDisclosures: {
+          restaurant_search: 'Sponsored',
+        },
+        targetId: 44,
+      },
+    ])
+  })
+
   it('ignores deferred restaurant_recommendations metadata in the current consumer resolver', () => {
     const resolved = buildResolvedPromotionRecords(
       [

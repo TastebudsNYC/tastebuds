@@ -16,6 +16,8 @@ import { requireAdminOrCron } from '@/lib/request-auth'
 import { createServerSupabaseAdminClient } from '@/lib/supabase/server'
 
 type CampaignRecord = {
+  archived_at: string | null
+  archived_by: string | null
   campaign_type: CampaignType
   created_at: string
   created_by: string | null
@@ -168,6 +170,8 @@ async function runCampaignMutation(
   adminClient: ReturnType<typeof createServerSupabaseAdminClient>,
   input: {
     action: 'activate' | 'create' | 'delete' | 'end' | 'pause' | 'reactivate' | 'update'
+      | 'archive'
+      | 'unarchive'
     actorId: string | null
     campaignId?: number | null
     campaignType?: CampaignType
@@ -229,7 +233,7 @@ async function fetchCampaigns() {
       adminClient
         .from('promotion_campaigns')
         .select(
-          'campaign_type, created_at, created_by, ends_on, event_id, id, internal_notes, name, promotion_priority, restaurant_id, starts_on, status, updated_at, updated_by'
+          'archived_at, archived_by, campaign_type, created_at, created_by, ends_on, event_id, id, internal_notes, name, promotion_priority, restaurant_id, starts_on, status, updated_at, updated_by'
         )
         .order('created_at', { ascending: false })
         .returns<CampaignRecord[]>(),
@@ -463,7 +467,7 @@ export async function PATCH(request: Request) {
     const { data: currentCampaign, error: currentCampaignError } = await adminClient
       .from('promotion_campaigns')
       .select(
-        'campaign_type, ends_on, event_id, id, internal_notes, name, promotion_priority, restaurant_id, starts_on, status'
+        'archived_at, campaign_type, ends_on, event_id, id, internal_notes, name, promotion_priority, restaurant_id, starts_on, status'
       )
       .eq('id', campaignId)
       .maybeSingle<
@@ -479,6 +483,7 @@ export async function PATCH(request: Request) {
           | 'restaurant_id'
           | 'starts_on'
           | 'status'
+          | 'archived_at'
         >
       >()
 
@@ -551,6 +556,21 @@ export async function PATCH(request: Request) {
 
     if (statusError) {
       return NextResponse.json({ error: statusError }, { status: 400 })
+    }
+
+    if (action === 'archive' && currentCampaign.archived_at) {
+      return NextResponse.json({ error: 'Campaign is already archived.' }, { status: 400 })
+    }
+
+    if (action === 'unarchive' && !currentCampaign.archived_at) {
+      return NextResponse.json({ error: 'Campaign is not archived.' }, { status: 400 })
+    }
+
+    if (currentCampaign.archived_at && action !== 'unarchive') {
+      return NextResponse.json(
+        { error: 'Archived campaigns must be restored before they can be changed.' },
+        { status: 400 }
+      )
     }
 
     const validationError = validateCampaignDraft({

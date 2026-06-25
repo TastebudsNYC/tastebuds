@@ -19,6 +19,7 @@ type CampaignSurfaceRow = {
 }
 
 type PromotionCampaignRow = {
+  archived_at?: string | null
   campaign_type: 'founding_partner' | 'promoted_event' | 'sponsored_listing'
   id: number
   promotion_campaign_surfaces: CampaignSurfaceRow[] | null
@@ -59,6 +60,10 @@ export function buildResolvedPromotionRecords(
   const liveSurfaceSet = new Set<PromotionSurface>(getLiveSurfacesForEntity(entityType))
 
   for (const campaign of campaigns) {
+    if (campaign.archived_at) {
+      continue
+    }
+
     const targetId =
       entityType === 'event' ? campaign.event_id ?? null : campaign.restaurant_id ?? null
 
@@ -167,17 +172,18 @@ export async function resolveActivePromotionRecords(
       ? adminClient
           .from('promotion_campaigns')
           .select(
-            'campaign_type, event_id, id, promotion_campaign_surfaces!inner(surface), promotion_priority, starts_on'
+            'archived_at, campaign_type, event_id, id, promotion_campaign_surfaces!inner(surface), promotion_priority, starts_on'
           )
           .not('event_id', 'is', null)
       : adminClient
           .from('promotion_campaigns')
           .select(
-            'campaign_type, id, promotion_campaign_surfaces!inner(surface), promotion_priority, restaurant_id, starts_on'
+            'archived_at, campaign_type, id, promotion_campaign_surfaces!inner(surface), promotion_priority, restaurant_id, starts_on'
           )
           .not('restaurant_id', 'is', null)
 
   const response = await query
+    .is('archived_at', null)
     .eq('status', 'active')
     .lte('starts_on', today)
     .gte('ends_on', today)

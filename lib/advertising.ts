@@ -37,16 +37,20 @@ export type PromotionSurface = (typeof SURFACE_OPTIONS)[number]
 export type LivePromotionSurface = (typeof LIVE_SURFACE_OPTIONS)[number]
 export type CampaignWriteAction =
   | 'activate'
+  | 'archive'
   | 'end'
   | 'pause'
   | 'reactivate'
+  | 'unarchive'
   | 'update'
 
 export const CAMPAIGN_WRITE_ACTIONS = [
   'activate',
+  'archive',
   'end',
   'pause',
   'reactivate',
+  'unarchive',
   'update',
 ] as const
 
@@ -184,6 +188,14 @@ export function validateCampaignAction(input: {
 
   if (action === 'end' && currentStatus === 'ended') {
     return 'Campaign is already ended.'
+  }
+
+  if (action === 'archive' && currentStatus !== 'ended') {
+    return 'Only ended campaigns can be archived.'
+  }
+
+  if (action === 'unarchive' && currentStatus !== 'ended') {
+    return 'Only ended campaigns can be restored from archive.'
   }
 
   if (action === 'update' && currentStatus === 'ended') {

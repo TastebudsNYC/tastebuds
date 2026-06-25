@@ -14,6 +14,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 function buildAdminClient(options?: {
   currentCampaign?: {
+    archived_at?: string | null
     campaign_type?: 'founding_partner' | 'promoted_event' | 'sponsored_listing'
     ends_on?: string
     event_id?: number | null
@@ -48,6 +49,7 @@ function buildAdminClient(options?: {
                 options?.currentCampaign === undefined
                   ? {
                       campaign_type: 'founding_partner',
+                      archived_at: null,
                       ends_on: '2026-07-10',
                       event_id: null,
                       id: 1,
@@ -212,6 +214,125 @@ describe('admin campaigns route', () => {
         p_campaign_id: 1,
       })
     )
+  })
+
+  it('allows archiving an ended campaign through the trusted mutation path', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        archived_at: null,
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'ended',
+      },
+      currentSurfaces: ['restaurant_search'],
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'archive', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'archive',
+        p_campaign_id: 1,
+      })
+    )
+  })
+
+  it('allows restoring an archived ended campaign', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        archived_at: '2026-06-25T10:00:00Z',
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'ended',
+      },
+      currentSurfaces: ['restaurant_search'],
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'unarchive', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(adminClient.rpc).toHaveBeenCalledWith(
+      'mutate_promotion_campaign',
+      expect.objectContaining({
+        p_action: 'unarchive',
+        p_campaign_id: 1,
+      })
+    )
+  })
+
+  it('blocks archiving campaigns that are not ended', async () => {
+    requireAdminOrCronMock.mockResolvedValue({
+      kind: 'admin',
+      user: { email: 'admin@example.com', id: 'admin-1' },
+    })
+    const adminClient = buildAdminClient({
+      currentCampaign: {
+        archived_at: null,
+        campaign_type: 'founding_partner',
+        ends_on: '2026-07-10',
+        event_id: null,
+        id: 1,
+        internal_notes: null,
+        name: 'Campaign',
+        promotion_priority: 0,
+        restaurant_id: 5,
+        starts_on: '2026-07-01',
+        status: 'active',
+      },
+      currentSurfaces: ['restaurant_search'],
+    })
+    createServerSupabaseAdminClientMock.mockReturnValue(adminClient)
+
+    const route = await import('@/app/api/admin/campaigns/route')
+    const response = await route.PATCH(
+      new Request('http://localhost/api/admin/campaigns', {
+        body: JSON.stringify({ action: 'archive', campaignId: 1 }),
+        method: 'PATCH',
+      })
+    )
+    const payload = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(payload.error).toBe('Only ended campaigns can be archived.')
+    expect(adminClient.rpc).not.toHaveBeenCalled()
   })
 
   it('does not revalidate an archived target when ending an active campaign', async () => {

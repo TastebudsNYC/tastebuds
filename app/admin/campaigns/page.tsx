@@ -23,6 +23,7 @@ import {
 import { supabase } from '@/lib/supabase/client'
 
 type AdminCampaign = {
+  archived_at: string | null
   campaign_type: CampaignType
   created_at: string
   ends_on: string
@@ -62,7 +63,14 @@ type CampaignPayload = {
   restaurants?: RestaurantOption[]
 }
 
-type CampaignAction = 'activate' | 'delete' | 'end' | 'pause' | 'reactivate'
+type CampaignAction =
+  | 'activate'
+  | 'archive'
+  | 'delete'
+  | 'end'
+  | 'pause'
+  | 'reactivate'
+  | 'unarchive'
 
 function formatCampaignType(value: CampaignType) {
   return value
@@ -146,6 +154,7 @@ export default function AdminCampaignsPage() {
   const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | CampaignStatus>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | CampaignType>('all')
+  const [showArchived, setShowArchived] = useState(false)
 
   const [name, setName] = useState('')
   const [campaignType, setCampaignType] = useState<CampaignType>('founding_partner')
@@ -173,6 +182,10 @@ export default function AdminCampaignsPage() {
   const eventById = useMemo(() => new Map(events.map((event) => [event.id, event])), [events])
 
   const filteredCampaigns = campaigns.filter((campaign) => {
+    if (!showArchived && campaign.archived_at !== null) {
+      return false
+    }
+
     if (statusFilter !== 'all' && campaign.status !== statusFilter) {
       return false
     }
@@ -438,6 +451,10 @@ export default function AdminCampaignsPage() {
       setSuccess(
         action === 'activate'
           ? 'Campaign activated.'
+          : action === 'archive'
+            ? 'Campaign archived.'
+            : action === 'unarchive'
+              ? 'Campaign restored from archive.'
           : action === 'pause'
             ? 'Campaign paused.'
             : action === 'reactivate'
@@ -673,6 +690,13 @@ export default function AdminCampaignsPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <button
+                className="rounded-xl border border-zinc-300 px-4 py-3 text-sm outline-none transition hover:border-zinc-950 hover:text-zinc-950"
+                onClick={() => setShowArchived((current) => !current)}
+                type="button"
+              >
+                {showArchived ? 'Hide archived campaigns' : 'Show archived campaigns'}
+              </button>
               <label className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
                   Status
@@ -736,6 +760,11 @@ export default function AdminCampaignsPage() {
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-zinc-600">
                             {formatCampaignStatus(campaign.status)}
                           </span>
+                          {campaign.archived_at ? (
+                            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-amber-700">
+                              Archived
+                            </span>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-sm text-zinc-600">
                           {formatCampaignType(campaign.campaign_type)} |{' '}
@@ -757,6 +786,11 @@ export default function AdminCampaignsPage() {
                             ? campaign.surfaces.join(', ')
                             : 'No surfaces configured yet'}
                         </p>
+                        {campaign.archived_at ? (
+                          <p className="mt-1 text-sm text-amber-700">
+                            Archived {campaign.archived_at.slice(0, 10)}
+                          </p>
+                        ) : null}
                         {campaign.internal_notes ? (
                           <p className="mt-3 max-w-3xl text-sm text-zinc-700">
                             {campaign.internal_notes}
@@ -770,7 +804,7 @@ export default function AdminCampaignsPage() {
                         >
                           Report
                         </Link>
-                        {campaign.status !== 'ended' ? (
+                        {campaign.status !== 'ended' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white"
                             onClick={() => loadCampaignForEdit(campaign)}
@@ -779,7 +813,7 @@ export default function AdminCampaignsPage() {
                             Edit
                           </button>
                         ) : null}
-                        {campaign.status === 'draft' ? (
+                        {campaign.status === 'draft' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
                             disabled={actionCampaignId === campaign.id}
@@ -789,7 +823,7 @@ export default function AdminCampaignsPage() {
                             {actionCampaignId === campaign.id ? 'Working...' : 'Activate'}
                           </button>
                         ) : null}
-                        {campaign.status === 'active' ? (
+                        {campaign.status === 'active' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
                             disabled={actionCampaignId === campaign.id}
@@ -799,7 +833,7 @@ export default function AdminCampaignsPage() {
                             {actionCampaignId === campaign.id ? 'Working...' : 'Pause'}
                           </button>
                         ) : null}
-                        {campaign.status === 'paused' ? (
+                        {campaign.status === 'paused' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
                             disabled={actionCampaignId === campaign.id}
@@ -809,7 +843,7 @@ export default function AdminCampaignsPage() {
                             {actionCampaignId === campaign.id ? 'Working...' : 'Reactivate'}
                           </button>
                         ) : null}
-                        {campaign.status !== 'ended' ? (
+                        {campaign.status !== 'ended' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-red-300 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
                             disabled={actionCampaignId === campaign.id}
@@ -819,7 +853,7 @@ export default function AdminCampaignsPage() {
                             {actionCampaignId === campaign.id ? 'Working...' : 'End'}
                           </button>
                         ) : null}
-                        {campaign.status === 'draft' ? (
+                        {campaign.status === 'draft' && campaign.archived_at === null ? (
                           <button
                             className="rounded-xl border border-red-300 px-3 py-2 text-xs font-medium text-red-700 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
                             disabled={actionCampaignId === campaign.id}
@@ -827,6 +861,26 @@ export default function AdminCampaignsPage() {
                             type="button"
                           >
                             {actionCampaignId === campaign.id ? 'Working...' : 'Delete'}
+                          </button>
+                        ) : null}
+                        {campaign.status === 'ended' && campaign.archived_at === null ? (
+                          <button
+                            className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
+                            disabled={actionCampaignId === campaign.id}
+                            onClick={() => void runCampaignAction(campaign.id, 'archive')}
+                            type="button"
+                          >
+                            {actionCampaignId === campaign.id ? 'Working...' : 'Archive'}
+                          </button>
+                        ) : null}
+                        {campaign.archived_at !== null ? (
+                          <button
+                            className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-400"
+                            disabled={actionCampaignId === campaign.id}
+                            onClick={() => void runCampaignAction(campaign.id, 'unarchive')}
+                            type="button"
+                          >
+                            {actionCampaignId === campaign.id ? 'Working...' : 'Restore'}
                           </button>
                         ) : null}
                       </div>

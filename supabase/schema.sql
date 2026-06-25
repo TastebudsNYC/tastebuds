@@ -607,7 +607,9 @@ create table public.promotion_campaigns (
   internal_notes text,
   created_by uuid references auth.users(id) on delete set null,
   updated_by uuid references auth.users(id) on delete set null,
+  archived_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now()),
+  archived_at timestamptz,
   updated_at timestamptz not null default timezone('utc', now()),
   check ((restaurant_id is not null) <> (event_id is not null)),
   check (
@@ -807,7 +809,8 @@ begin
     inner join public.restaurants as r
       on r.id = pc.restaurant_id
      and r.archived_at is null
-    where pc.status = 'active'
+    where pc.archived_at is null
+      and pc.status = 'active'
       and pc.restaurant_id = p_target_id
       and pc.starts_on <= v_report_date
       and pc.ends_on >= v_report_date
@@ -826,7 +829,8 @@ begin
     inner join public.events as e
       on e.id = pc.event_id
      and e.archived_at is null
-    where pc.status = 'active'
+    where pc.archived_at is null
+      and pc.status = 'active'
       and pc.event_id = p_target_id
       and pc.starts_on <= v_report_date
       and pc.ends_on >= v_report_date
@@ -931,7 +935,17 @@ begin
     return;
   end if;
 
-  if p_action not in ('create', 'update', 'activate', 'pause', 'reactivate', 'end', 'delete') then
+  if p_action not in (
+    'create',
+    'update',
+    'activate',
+    'pause',
+    'reactivate',
+    'end',
+    'delete',
+    'archive',
+    'unarchive'
+  ) then
     return query select false, null::bigint, 'Invalid action.';
     return;
   end if;
@@ -980,6 +994,12 @@ begin
     v_next_internal_notes := nullif(btrim(coalesce(p_internal_notes, '')), '');
     v_next_status := 'draft';
   elsif p_action = 'update' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status = 'ended' then
       return query
       select false, v_current.id, 'Ended campaigns are read-only. Create a new campaign instead.';
@@ -1017,6 +1037,12 @@ begin
       return;
     end if;
   elsif p_action = 'activate' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status <> 'draft' then
       return query select false, v_current.id, 'Only draft campaigns can be activated.';
       return;
@@ -1033,6 +1059,12 @@ begin
     v_next_status := 'active';
     v_next_surfaces := v_current_surfaces;
   elsif p_action = 'pause' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status <> 'active' then
       return query select false, v_current.id, 'Only active campaigns can be paused.';
       return;
@@ -1047,6 +1079,12 @@ begin
     return query select true, v_current.id, null::text;
     return;
   elsif p_action = 'reactivate' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status = 'ended' then
       return query
       select false, v_current.id, 'Ended campaigns cannot be reactivated. Create a new campaign instead.';
@@ -1069,6 +1107,12 @@ begin
     v_next_status := 'active';
     v_next_surfaces := v_current_surfaces;
   elsif p_action = 'end' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status = 'ended' then
       return query select false, v_current.id, 'Campaign is already ended.';
       return;
@@ -1083,12 +1127,58 @@ begin
     return query select true, v_current.id, null::text;
     return;
   elsif p_action = 'delete' then
+    if v_current.archived_at is not null then
+      return query
+      select false, v_current.id, 'Archived campaigns must be restored before they can be changed.';
+      return;
+    end if;
+
     if v_current.status <> 'draft' then
       return query select false, v_current.id, 'Only draft campaigns may be deleted.';
       return;
     end if;
 
     delete from public.promotion_campaigns
+    where id = v_current.id;
+
+    return query select true, v_current.id, null::text;
+    return;
+  elsif p_action = 'archive' then
+    if v_current.status <> 'ended' then
+      return query select false, v_current.id, 'Only ended campaigns can be archived.';
+      return;
+    end if;
+
+    if v_current.archived_at is not null then
+      return query select false, v_current.id, 'Campaign is already archived.';
+      return;
+    end if;
+
+    update public.promotion_campaigns
+    set archived_at = v_now,
+        archived_by = p_actor_id,
+        updated_at = v_now,
+        updated_by = p_actor_id
+    where id = v_current.id;
+
+    return query select true, v_current.id, null::text;
+    return;
+  elsif p_action = 'unarchive' then
+    if v_current.status <> 'ended' then
+      return query select false, v_current.id, 'Only ended campaigns can be restored from archive.';
+      return;
+    end if;
+
+    if v_current.archived_at is null then
+      return query select false, v_current.id, 'Campaign is not archived.';
+      return;
+    end if;
+
+    update public.promotion_campaigns
+    set archived_at = null,
+        archived_by = null,
+        updated_at = v_now,
+        updated_by = p_actor_id
     where id = v_current.id;
 
     return query select true, v_current.id, null::text;
@@ -1239,8 +1329,7 @@ begin
         where surface_value in (
           'restaurant_search',
           'restaurant_category',
-          'restaurant_neighbourhood',
-          'restaurant_recommendations'
+          'restaurant_neighbourhood'
         )
       )
       into v_has_live_surface;
