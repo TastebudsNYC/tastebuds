@@ -764,6 +764,12 @@ export default function AdminCampaignsPage() {
                         ) : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Link
+                          className="rounded-xl border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-700 transition hover:border-zinc-950 hover:text-zinc-950"
+                          href={`/admin/campaigns/${campaign.id}/report`}
+                        >
+                          Report
+                        </Link>
                         {campaign.status !== 'ended' ? (
                           <button
                             className="rounded-xl border border-zinc-950 px-3 py-2 text-xs font-medium text-zinc-950 transition hover:bg-zinc-950 hover:text-white"

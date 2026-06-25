@@ -237,6 +237,12 @@ describe('advertising promotion helpers', () => {
     expect(JSON.stringify(rows)).not.toContain('campaignStatus')
     expect(JSON.stringify(rows)).not.toContain('campaignStartsOn')
     expect(JSON.stringify(rows)).not.toContain('campaignEndsOn')
+    expect(JSON.stringify(rows)).not.toContain('impression_count')
+    expect(JSON.stringify(rows)).not.toContain('venue_profile_view_count')
+    expect(JSON.stringify(rows)).not.toContain('event_view_count')
+    expect(JSON.stringify(rows)).not.toContain('save_count')
+    expect(JSON.stringify(rows)).not.toContain('rsvp_count')
+    expect(JSON.stringify(rows)).not.toContain('website_click_count')
   })
 
   it('derives the active campaign date from the New York calendar near UTC midnight', () => {
